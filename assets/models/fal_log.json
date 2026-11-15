@@ -1,0 +1,130 @@
+[
+ {
+  "endpoint": "fal-ai/nano-banana-pro/edit",
+  "name": "sword_concept",
+  "seconds": 18.9,
+  "arguments": {
+   "aspect_ratio": "16:9",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab293fa/f2kyl8mWYJ8771kAngxGX_ref_1757.jpg"
+   ]
+  },
+  "prompt": "A single forged longsword shown in flat side view, blade horizontal, tip to the right, complete weapon visible end to end with margin. Same style as the reference weapon: broad straight double-edged steel blade with a pale grey satin finish and one dark fuller groove down the centre, short brass crossguard, brown leather-wrapped grip with visible wrap rings, simple steel pommel. Slightly worn and hand-made, small hammer marks on the steel. Isolated on a plain flat light grey studio background, even soft light, no shadow, no hands, no bench, no text, no second object.",
+  "files": [
+   "assets/models/sword_concept.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/birefnet/v2",
+  "name": "sword_cut",
+  "seconds": 3.9,
+  "arguments": {
+   "image_url": "https://v3b.fal.media/files/b/0ab293fe/uWEWf53mpiXzWsYtfSCnZ_sword_concept.png"
+  },
+  "prompt": null,
+  "files": [
+   "assets/models/sword_cut.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "sword_concept",
+  "seconds": 18.9,
+  "arguments": {
+   "quality": "high",
+   "image_size": "landscape_16_9",
+   "output_format": "png",
+   "background": "transparent",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab29437/JWwQSV2t6C-AhLFAyEAJU_ref_1757.jpg"
+   ]
+  },
+  "prompt": "The same forged metal object from the reference, shown as a clean flat side view, lying perfectly horizontal with the pointed end to the right, the whole item visible end to end with margin. A long tapered flat bar of pale satin grey steel with faint hammer marks, one narrow dark groove running down its centre, a short brass guard where it meets a brown leather-wrapped handle with visible wrap rings, and a plain steel end cap. Weathered hand-forged heirloom prop. Even flat studio lighting, no shadow, no ground, no hands, no table, no text. The object alone on a fully transparent background.",
+  "files": [
+   "assets/models/sword_concept.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/birefnet/v2",
+  "name": "sword_cut",
+  "seconds": 3.0,
+  "arguments": {
+   "image_url": "https://v3b.fal.media/files/b/0ab2943c/WrGfofTPpLb-6aVtlK6Y4_sword_concept.png"
+  },
+  "prompt": null,
+  "files": [
+   "assets/models/sword_cut.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "hammer_concept",
+  "seconds": 22.4,
+  "arguments": {
+   "quality": "high",
+   "image_size": "square_hd",
+   "output_format": "png",
+   "background": "transparent",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab29440/8qO6nePIgiLPmaEkgeZaD_ref_1757.jpg"
+   ]
+  },
+  "prompt": "The same blacksmith's hammer seen in the reference, isolated as a clean game prop: a heavy rectangular black iron head with a slightly domed striking face, chipped edges and a forged cross-peen on the back, mounted on a handle wrapped in tightly coiled ribbed copper-and-dark-leather binding with a rounded end knob. Shown in three-quarter view, the whole object visible with margin, standing at a slight diagonal. Weathered and sooty. Even flat studio lighting, no shadow, no ground, no hand, no text. The hammer alone on a fully transparent background.",
+  "files": [
+   "assets/models/hammer_concept.png"
+  ]
+ },
+ {
+  "endpoint": "meshy/v7.1/image-to-3d",
+  "name": "blade",
+  "seconds": 117.8,
+  "arguments": {
+   "should_texture": true,
+   "enable_pbr": true,
+   "topology": "triangle",
+   "target_polycount": 12000,
+   "image_url": "https://v3b.fal.media/files/b/0ab29440/MW2rM8YjdqKjF_OJ_PBUh_sword_concept.png"
+  },
+  "prompt": null,
+  "files": [
+   "assets/models/blade_0.glb",
+   "assets/models/blade_1.png",
+   "assets/models/blade_2.glb",
+   "assets/models/blade_3.fbx",
+   "assets/models/blade_4.obj",
+   "assets/models/blade_5.usdz",
+   "assets/models/blade_6.stl",
+   "assets/models/blade_7.png",
+   "assets/models/blade_8.png",
+   "assets/models/blade_9.png",
+   "assets/models/blade_10.png"
+  ]
+ },
+ {
+  "endpoint": "meshy/v7.1/image-to-3d",
+  "name": "hammer",
+  "seconds": 140.0,
+  "arguments": {
+   "should_texture": true,
+   "enable_pbr": true,
+   "topology": "triangle",
+   "target_polycount": 8000,
+   "image_url": "https://v3b.fal.media/files/b/0ab29466/D2nHsn0ur3VdRh4rYComi_hammer_concept.png"
+  },
+  "prompt": null,
+  "files": [
+   "assets/models/hammer_0.glb",
+   "assets/models/hammer_1.png",
+   "assets/models/hammer_2.glb",
+   "assets/models/hammer_3.fbx",
+   "assets/models/hammer_4.obj",
+   "assets/models/hammer_5.usdz",
+   "assets/models/hammer_6.stl",
+   "assets/models/hammer_7.png",
+   "assets/models/hammer_8.png",
+   "assets/models/hammer_9.png",
+   "assets/models/hammer_10.png"
+  ]
+ }
+]

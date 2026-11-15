@@ -1,0 +1,164 @@
+[
+ {
+  "endpoint": "fal-ai/nano-banana-pro/edit",
+  "name": "brick",
+  "seconds": 20.2,
+  "arguments": {
+   "aspect_ratio": "1:1",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab293e7/4FOakFXEsyjIDGb4JB75i_ref_1757.jpg"
+   ]
+  },
+  "prompt": "A seamless tileable texture of the same dark warm brick wall as the reference: old reddish-brown and grey-olive clay bricks, uneven handmade edges, deep dark mortar joints, soot and grime, a few chipped corners. Head-on flat orthographic view, perfectly even soft light, no shadows, no perspective, no vignette, no objects, no text. The bricks fill the whole frame edge to edge and the pattern tiles seamlessly.",
+  "files": [
+   "assets/textures/brick.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/nano-banana-pro/edit",
+  "name": "benchwood",
+  "seconds": 19.1,
+  "arguments": {
+   "aspect_ratio": "1:1",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab293ed/YSh8N4SiO-sn2ZhJQHA6D_ref_1757.jpg"
+   ]
+  },
+  "prompt": "A seamless tileable texture of an old blacksmith's workbench top, seen from directly above. Very dark oiled hardwood, near-black walnut with warm brown grain showing through, deep scratches, chisel gouges, faint scorch marks and burns, a few hammer dents, thin layer of soot. Flat even soft light, no shadows, no perspective, no objects, no text, no vignette. The surface fills the frame edge to edge and tiles seamlessly.",
+  "files": [
+   "assets/textures/benchwood.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/nano-banana-pro/edit",
+  "name": "floorplank",
+  "seconds": 18.7,
+  "arguments": {
+   "aspect_ratio": "1:1",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab293f1/fZHc65brcAXhmCJlZzxsu_ref_1734.jpg"
+   ]
+  },
+  "prompt": "A seamless tileable texture of an old forge floor, seen from directly above: long dark oak planks, near-black with grey ash dust settled in the grooves, worn edges, fine cracks between boards, a scatter of coal grit. Flat even soft light, no shadows, no perspective, no objects, no text. Planks run horizontally and the pattern tiles seamlessly edge to edge.",
+  "files": [
+   "assets/textures/floorplank.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/nano-banana-pro/edit",
+  "name": "paper_cal",
+  "seconds": 20.1,
+  "arguments": {
+   "aspect_ratio": "3:4",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab293f4/LqKl1EWKR3NojCH_lrUj2_ref_1757.jpg"
+   ]
+  },
+  "prompt": "A single old paper calendar page from a forge wall, pinned and hanging, seen straight on. Aged yellowed paper with a printed grid of dates, many dates crossed out with faded red ink X marks, faded blue handwritten notes and numbers in the margins, a few brown rust stains and a torn bottom corner. Portrait orientation, the whole page visible with slightly wavy edges. Isolated on a flat pure black background, even flat light, no shadow, no wall, no pins, no text besides the calendar marks.",
+  "files": [
+   "assets/textures/paper_cal.png"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/birefnet/v2",
+  "name": "paper_cal_cut",
+  "seconds": 2.9,
+  "arguments": {
+   "image_url": "https://v3b.fal.media/files/b/0ab293f7/C2KJd9vM8QBo9IJuEJuZ7_paper_cal.png"
+  },
+  "prompt": null,
+  "files": [
+   "assets/textures/paper_cal_cut.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "brick",
+  "seconds": 32.9,
+  "arguments": {
+   "quality": "high",
+   "image_size": "square_hd",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab29415/p5AUVFOCAaxmiTXo1qw8W_ref_1757.jpg"
+   ]
+  },
+  "prompt": "Create a seamless tileable texture of the same dark warm brick wall as the reference frame: old handmade clay bricks in reddish-brown and olive-grey, chipped uneven edges, deep near-black mortar joints, soot and grime, a few cracked bricks. Straight-on orthographic view, perfectly even flat lighting, no shadows, no bevel highlights, no vignette, no perspective, no objects, no text. Bricks fill the entire frame edge to edge with a repeatable running-bond pattern that tiles seamlessly in all directions.",
+  "files": [
+   "assets/textures/brick.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "brick",
+  "seconds": 36.4,
+  "arguments": {
+   "quality": "high",
+   "image_size": "square_hd",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab2941a/b8oPHg2BaXNQwuX4gz0mr_ref_1757.jpg"
+   ]
+  },
+  "prompt": "Seamless tileable texture, straight-on orthographic view of a very old sooty forge wall, matching the dark muted palette of the reference frame exactly. Handmade clay bricks in dull grey-olive, dusty taupe and only slightly reddish umber \u2014 heavily desaturated, no bright orange, no terracotta. Thick deep near-black mortar, uneven chipped edges, soot streaks, grime, a few hairline cracks. Flat even shadowless lighting, no vignette, no perspective, no objects, no text. Bricks fill the frame edge to edge in a repeatable running-bond pattern that tiles seamlessly.",
+  "files": [
+   "assets/textures/brick.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "benchwood",
+  "seconds": 29.1,
+  "arguments": {
+   "quality": "high",
+   "image_size": "square_hd",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab2941f/Rqb_I1KxiZK5bsdHjWhoQ_ref_1757.jpg"
+   ]
+  },
+  "prompt": "Seamless tileable texture, viewed from directly above: the top of an old blacksmith's workbench, matching the dark palette of the reference. Very dark oiled hardwood, near-black walnut with faint warm brown grain, deep scratches, chisel gouges, small hammer dents, scorch and burn marks, a dusting of coal soot. Low saturation, no red, no bright highlights. Flat even shadowless light, no perspective, no objects, no text, no vignette. Surface fills the frame edge to edge and tiles seamlessly.",
+  "files": [
+   "assets/textures/benchwood.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "floorplank",
+  "seconds": 34.3,
+  "arguments": {
+   "quality": "high",
+   "image_size": "square_hd",
+   "output_format": "png",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab29425/cd1xtEkUgUou5YNyKEHRj_ref_1734.jpg"
+   ]
+  },
+  "prompt": "Seamless tileable texture seen from directly above: an old forge floor of long dark oak planks, matching the reference's dark palette. Near-black aged oak, faint grey ash dust settled in the grooves, worn rounded board edges, fine cracks and knots, scattered coal grit and soot. Low saturation, no orange, no bright highlights. Flat even shadowless lighting, no perspective, no objects, no text, no vignette. Planks run horizontally across the frame and the pattern tiles seamlessly.",
+  "files": [
+   "assets/textures/floorplank.png"
+  ]
+ },
+ {
+  "endpoint": "openai/gpt-image-2.5/flare/edit",
+  "name": "paper_cal",
+  "seconds": 24.3,
+  "arguments": {
+   "quality": "high",
+   "image_size": "portrait_4_3",
+   "output_format": "png",
+   "background": "transparent",
+   "image_urls": [
+    "https://v3b.fal.media/files/b/0ab2942a/zq_YY3N6H7krNnMQTc9oK_ref_1757.jpg"
+   ]
+  },
+  "prompt": "A single old paper calendar page from a forge wall, seen straight on and filling most of the frame, exactly as in the reference: aged yellowed paper with a printed grid of dates, many dates crossed out with faded red ink X marks, a blue handwritten annotation in the margins, a few brown rust stains and one torn bottom corner. Slightly wavy paper edges. Even flat lighting, no cast shadow, no wall, no pins. The paper alone on a fully transparent background.",
+  "files": [
+   "assets/textures/paper_cal.png"
+  ]
+ }
+]

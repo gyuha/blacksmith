@@ -1,0 +1,215 @@
+version: '3'
+
+# THE TEMPER — a Three.js game rebuilt from forgetax.mp4.
+# `task` lists everything; `task <name>` runs one. Run from the repo root.
+
+vars:
+  PORT: '8123'
+  BASE: 'http://127.0.0.1:{{.PORT}}'
+  SKILL: '.agents/skills/video-to-game'
+  SOURCE: 'forgetax.mp4'
+  # the seeded run the recorded take was made with
+  SEED: '3'
+  REC_SECONDS: '40'
+  SIZE: '1280x720'
+  TAKE: 'takes/take_final.mp4'
+  # source-video window used for the study pass and the style references
+  CLIP_START: '1730'
+  CLIP_LEN: '130'
+
+tasks:
+  default:
+    desc: List the available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  doctor:
+    desc: Check the tools this project needs
+    silent: true
+    cmds:
+      - |
+        ok=0
+        for c in node python3 ffmpeg ffprobe task; do
+          if command -v $c >/dev/null 2>&1; then printf '  ok    %s\n' "$c"
+          else printf '  MISSING %s\n' "$c"; ok=1; fi
+        done
+        if command -v blender >/dev/null 2>&1; then printf '  ok    blender (%s)\n' "$(blender --version | head -1)"
+        else printf '  MISSING blender (needed by props/shrink)\n'; fi
+        if [ -d node_modules/playwright-core ]; then printf '  ok    playwright-core\n'
+        else printf '  MISSING playwright-core — run: task setup\n'; fi
+        python3 -c 'import fal_client' 2>/dev/null && printf '  ok    fal-client\n' || printf '  note  fal-client missing (only needed for fal:*) — task setup\n'
+        if [ -n "$FAL_KEY" ]; then printf '  ok    FAL_KEY set\n'; else printf '  note  FAL_KEY unset (only needed for fal:*)\n'; fi
+        exit $ok
+
+  setup:
+    desc: Install the JS and Python pieces the tooling needs
+    cmds:
+      - npm install playwright-core --no-audit --no-fund
+      - cmd: python3 -m pip install --quiet fal-client
+        ignore_error: true
+
+  serve:
+    desc: Serve the game on :8123 (Ctrl-C to stop)
+    interactive: true
+    cmds:
+      - python3 -m http.server {{.PORT}}
+
+  open:
+    desc: Open the game in the default browser
+    cmds:
+      - open "{{.BASE}}/index.html"
+
+  play:
+    desc: Serve the game and open it in the browser
+    interactive: true
+    cmds:
+      - (sleep 1; open "{{.BASE}}/index.html") &
+      - python3 -m http.server {{.PORT}}
+
+  shot:
+    desc: Screenshot the game. task shot QUERY='station=shop' OUT=probe/x.png
+    vars:
+      QUERY: '{{.QUERY | default "autostart"}}'
+      OUT: '{{.OUT | default "probe/shot.png"}}'
+    cmds:
+      - mkdir -p "$(dirname '{{.OUT}}')"
+      - node shot.mjs "{{.BASE}}/index.html?{{.QUERY}}" "{{.OUT}}" 4500
+
+  verify:
+    desc: Load the game headless and fail on console errors
+    cmds:
+      - mkdir -p probe
+      - |
+        out=$(node shot.mjs "{{.BASE}}/index.html?autostart" probe/verify.png 4500)
+        echo "$out"
+        echo "$out" | grep -q 'errors 0' || { echo "console errors present" >&2; exit 1; }
+
+  record:
+    desc: Film a take with the keyboard scenario
+    vars:
+      OUT: '{{.OUT | default .TAKE}}'
+      QUERY: '{{.QUERY | default (printf "autostart&seed=%s" .SEED)}}'
+    cmds:
+      - mkdir -p "$(dirname '{{.OUT}}')"
+      - node {{.SKILL}}/scripts/record_play.mjs "{{.BASE}}/index.html?{{.QUERY}}" play.mjs
+        -o "{{.OUT}}" --seconds {{.REC_SECONDS}} --size {{.SIZE}}
+
+  best:
+    desc: Rank the liveliest windows of a take and cut the best 10 s
+    vars:
+      IN: '{{.IN | default .TAKE}}'
+      LEN: '{{.LEN | default "10"}}'
+    cmds:
+      - python3 {{.SKILL}}/scripts/best_window.py "{{.IN}}" --length {{.LEN}} --top 3
+      - python3 {{.SKILL}}/scripts/best_window.py "{{.IN}}" --length {{.LEN}} --cut takes/take_best{{.LEN}}.mp4
+
+  pairs:
+    desc: Rebuild the three side-by-side pairs against the source video
+    cmds:
+      - mkdir -p pairs probe
+      - node shot.mjs "{{.BASE}}/index.html?autostart&station=hearth" probe/hearth.png 4000
+      - python3 {{.SKILL}}/scripts/side_by_side.py {{.SOURCE}} "{{.TAKE}}" -o pairs/
+        --times 1757 --game-offset -1751.2 --height 640
+      - python3 {{.SKILL}}/scripts/side_by_side.py {{.SOURCE}} "{{.TAKE}}" -o pairs/
+        --times 1800 --game-offset -1773.5 --height 640
+      - python3 {{.SKILL}}/scripts/side_by_side.py {{.SOURCE}} probe/hearth.png -o pairs/
+        --times 1762 --height 640
+
+  clip:
+    desc: Cut the forge segment out of the long source (for the study pass)
+    cmds:
+      - mkdir -p study
+      - ffmpeg -v error -ss {{.CLIP_START}} -t {{.CLIP_LEN}} -i {{.SOURCE}}
+        -c:v libx264 -crf 20 -an study/clip_forge.mp4 -y
+
+  study:
+    desc: Contact sheet, frames, palette and cuts from the source segment
+    deps: [clip]
+    cmds:
+      - python3 {{.SKILL}}/scripts/study_video.py study/clip_forge.mp4 -o study/ --every 1 --colors 14
+
+  props:
+    desc: Rebuild the Blender props (GLB) from build_props.py
+    sources: [build_props.py, assets/textures/brick.png, assets/textures/benchwood.png]
+    generates:
+      - assets/models/bench.glb
+      - assets/models/anvil.glb
+      - assets/models/hearth.glb
+      - assets/models/hearth_fire.glb
+      - assets/models/cabinet.glb
+      - assets/models/stool.glb
+      - assets/models/lamp.glb
+      - assets/models/bucket.glb
+      - assets/models/toolrack.glb
+    cmds:
+      - blender --background --python build_props.py
+
+  shrink:
+    desc: Decimate and repack a generated mesh. task shrink -- in.glb out.glb
+    preconditions:
+      - sh: test -n "{{.CLI_ARGS}}"
+        msg: "usage: task shrink -- assets/models/in.glb assets/models/out.glb"
+    cmds:
+      - blender --background --python shrink.py -- {{.CLI_ARGS}}
+
+  # --- fal, one job at a time; every call is logged to assets/*/fal_log.json ---
+  fal:image:
+    desc: Generate an image from a video frame. task fal:image -- endpoint out/ name "prompt" refs/ref_1757.jpg
+    vars:
+      ENDPOINT: '{{.ENDPOINT | default "openai/gpt-image-2.5/flare/edit"}}'
+      OUT: '{{.OUT | default "assets/textures"}}'
+      NAME: '{{.NAME | default "untitled"}}'
+      PROMPT: '{{.PROMPT | default ""}}'
+      REF: '{{.REF | default "refs/ref_1757.jpg"}}'
+    cmds:
+      - python3 {{.SKILL}}/scripts/fal_asset.py {{.ENDPOINT}} -o {{.OUT}}/
+        --name {{.NAME}} --arg prompt="{{.PROMPT}}" --arg quality=high
+        --arg output_format=png --file image_urls={{.REF}}
+
+  fal:sfx:
+    desc: Generate a sound effect. task fal:sfx -- name "description" seconds
+    vars:
+      NAME: '{{.NAME | default "sfx"}}'
+      TEXT: '{{.TEXT | default ""}}'
+      DUR: '{{.DUR | default "2"}}'
+    cmds:
+      - python3 {{.SKILL}}/scripts/fal_asset.py fal-ai/elevenlabs/sound-effects/v2 -o assets/sfx/
+        --name {{.NAME}} --arg text="{{.TEXT}}" --arg duration_seconds={{.DUR}}
+        --arg prompt_influence=0.7
+
+  fal:mesh:
+    desc: Image to GLB. task fal:mesh -- assets/models/concept.png name
+    vars:
+      IMAGE: '{{.IMAGE | default "assets/models/sword_concept.png"}}'
+      NAME: '{{.NAME | default "mesh"}}'
+    cmds:
+      - python3 {{.SKILL}}/scripts/fal_asset.py meshy/v7.1/image-to-3d -o assets/models/
+        --name {{.NAME}} --file image_url={{.IMAGE}} --arg should_texture=true
+        --arg enable_pbr=true --arg topology=triangle --arg target_polycount=12000
+
+  cost:
+    desc: Summarise the fal calls logged under assets/
+    silent: true
+    cmds:
+      - |
+        python3 - <<'PY'
+        import json, glob, collections
+        rows = []
+        for f in glob.glob('assets/*/fal_log.json'):
+            rows += json.load(open(f))
+        for endpoint, n in collections.Counter(r['endpoint'] for r in rows).most_common():
+            print(f'  {n:3d}  {endpoint}')
+        print(f'  ---\n  {len(rows):3d}  total logged calls')
+        PY
+
+  clean:
+    desc: Remove scratch screenshots and temp pairs
+    cmds:
+      - rm -rf probe
+
+  clean:takes:
+    desc: Delete recorded takes (they are gitignored anyway)
+    prompt: This deletes every .mp4 under takes/. Continue?
+    cmds:
+      - rm -f takes/*.mp4

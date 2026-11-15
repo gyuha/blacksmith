@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Temper</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050505; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #ui { position: fixed; inset: 0; pointer-events: none; color: #cbb79a;
+        font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+  #title { position: absolute; left: 50%; top: 43%; transform: translate(-50%,-50%);
+           text-align: center; letter-spacing: .38em; transition: opacity .9s; }
+  #title h1 { margin: 0; font-size: 46px; font-weight: 400; color: #ecdcbc;
+              text-shadow: 0 0 30px rgba(255,150,50,.30); }
+  #title p  { margin: 15px 0 0; font-size: 12px; letter-spacing: .24em; color: #8d7a60; }
+  #hint { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+          font-size: 11.5px; letter-spacing: .2em; color: #8a7861; opacity: .85; white-space: nowrap;
+          transition: opacity .5s; }
+  #corner { position: absolute; left: 20px; bottom: 18px; font-size: 13px; letter-spacing: .1em;
+            display: flex; gap: 16px; align-items: center; color: #b8a284; opacity: 0; transition: opacity .8s; }
+  #corner .coin { width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+                  background: radial-gradient(circle at 35% 30%, #ffd88a, #a9741f 70%, #5c3d0d);
+                  box-shadow: 0 0 10px rgba(255,180,70,.5); margin-right: 7px; vertical-align: -1px; }
+  #tierTag { color: #e0cba6; opacity: .92; }
+  #prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%);
+            font-size: 12px; letter-spacing: .26em; color: #c8a878; opacity: 0; transition: opacity .35s;
+            text-shadow: 0 0 14px rgba(255,140,40,.35); }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="ui">
+  <div id="title"><h1>THE TEMPER</h1><p>a forge, a wager, a number that keeps climbing</p></div>
+  <div id="corner"><span><i class="coin"></i><b id="gold">2,000</b></span><span id="tierTag"></span></div>
+  <div id="prompt"></div>
+  <div id="hint"></div>
+  <div id="flash"></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search);
+let seed = +(Q.get('seed') || 1);
+const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+for (let i = 0; i < 37; i++) rand();   // let a small seed settle before the first roll
+
+// palette sampled from the video with study_video.py: olive graphite, near-black, warm amber
+const PAL = { haze: 0x0d0e0b, brick: 0x8a7c68, floor: 0x8f8676, amber: 0xffa64d, ember: 0xff6a1e };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(PAL.haze);
+scene.fog = new THREE.FogExp2(PAL.haze, 0.042);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.04, 120);
+
+/* ---------- post: bloom, one grade, vignette, grain, slight fringing on the glow ---------- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.40, 0.68, 0.90);
+composer.addPass(bloom);
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.58 }, uGrain: { value: 0.030 },
+              uCA: { value: 0.0014 }, uLift: { value: new THREE.Vector3(0.019, 0.013, 0.004) },
+              uGain: { value: new THREE.Vector3(1.05, 1.0, 0.93) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime,uVig,uGrain,uCA; uniform vec3 uLift,uGain; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+    void main(){
+      vec2 d = vUv - .5; float r = length(d);
+      vec2 off = d * uCA * (0.4 + r);
+      vec3 c;
+      c.r = texture2D(tDiffuse, vUv + off).r;
+      c.g = texture2D(tDiffuse, vUv).g;
+      c.b = texture2D(tDiffuse, vUv - off).b;
+      c = c * uGain + uLift;
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(c, vec3(lum) * vec3(1.02, 1.0, 0.94), 0.20);   // pull the greens/browns together
+      c *= 1. - uVig * smoothstep(.28,.95,r*1.3);
+      c += (h(vUv*1024. + fract(uTime)*91.) - .5) * uGrain * (0.55 + 0.9*(1.-dot(c,vec3(.33))));
+      gl_FragColor = vec4(c,1.);
+    }`,
+});
+composer.addPass(grade);
+composer.addPass(new OutputPass());
+
+/* ---------- lights ---------- */
+scene.add(new THREE.HemisphereLight(0x7a6f5c, 0x1c1813, 0.78));
+const keyLight = new THREE.SpotLight(0xffb877, 34, 10, 0.92, 0.68, 1.35);
+keyLight.position.set(-1.25, 2.62, -1.35);
+keyLight.target.position.set(0.08, 1.0, -3.35);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.bias = -0.0008;
+keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 9;
+scene.add(keyLight, keyLight.target);
+
+const fireLight = new THREE.PointLight(0xff7a20, 9, 9, 2.0);
+fireLight.position.set(-3.20, 0.80, -0.40);
+scene.add(fireLight);
+const lampLight = new THREE.PointLight(0xffc070, 2.2, 6, 2);
+lampLight.position.set(2.72, 1.10, 1.02);
+scene.add(lampLight);
+const hearthFill = new THREE.SpotLight(0xff9a4d, 22, 7, 1.0, 0.9, 1.6);
+hearthFill.position.set(-2.3, 2.1, 0.7);
+hearthFill.target.position.set(-3.4, 0.9, -0.4);
+scene.add(hearthFill, hearthFill.target);
+
+const shopFill = new THREE.SpotLight(0xffc98a, 7.5, 6.5, 1.0, 0.9, 1.6);
+shopFill.position.set(1.2, 2.2, 0.5);
+shopFill.target.position.set(3.4, 1.4, -0.55);
+scene.add(shopFill, shopFill.target);
+
+const shopLamp = new THREE.PointLight(0xffcf95, 1.9, 3.2, 2.0);
+shopLamp.position.set(2.95, 1.62, -0.55);
+scene.add(shopLamp);
+
+const roomFill = new THREE.PointLight(0xffb377, 5.5, 9, 2.0);
+roomFill.position.set(0, 2.55, -0.4);
+scene.add(roomFill);
+
+const benchGlow = new THREE.PointLight(0xffd9a0, 0, 2.6, 2.2);
+benchGlow.position.set(0.08, 1.02, -3.30);
+scene.add(benchGlow);
+
+/* ---------- textures ---------- */
+const TL = new THREE.TextureLoader();
+const loadTex = (p, rx = 1, ry = 1) => {
+  const t = TL.load(p, () => { t.needsUpdate = true; });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+};
+const brickTex = loadTex('assets/textures/brick.png', 8.5, 3.6);
+const floorTex = loadTex('assets/textures/floorplank.png', 11, 9);
+const woodTex = loadTex('assets/textures/benchwood.png', 1.5, 1.5);
+const paperTex = TL.load('assets/textures/paper_cal.png');
+
+/* ---------- room ---------- */
+const ROOM = { x0: -3.60, x1: 3.60, z0: -4.15, z1: 2.40, h: 3.10 };
+const wallMat = new THREE.MeshStandardMaterial({ map: brickTex, color: 0x9a8b74, roughness: 0.95 });
+const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, color: 0x9a9080, roughness: 0.88 });
+const beamMat = new THREE.MeshStandardMaterial({ color: 0x211c17, roughness: 0.9 });
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 6.55), floorMat);
+floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -0.875); floor.receiveShadow = true;
+scene.add(floor);
+
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 6.55), new THREE.MeshStandardMaterial({ color: 0x121009, roughness: 1 }));
+ceil.rotation.x = Math.PI / 2; ceil.position.set(0, ROOM.h, -0.875);
+scene.add(ceil);
+
+function wall(w, h, pos, roty) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+  m.position.copy(pos); m.rotation.y = roty; m.receiveShadow = true;
+  scene.add(m); return m;
+}
+wall(7.2, ROOM.h, new THREE.Vector3(0, ROOM.h / 2, ROOM.z0), 0);               // north (behind bench)
+wall(6.55, ROOM.h, new THREE.Vector3(ROOM.x0, ROOM.h / 2, -0.875), Math.PI / 2); // west
+wall(6.55, ROOM.h, new THREE.Vector3(ROOM.x1, ROOM.h / 2, -0.875), -Math.PI / 2); // east
+wall(7.2, ROOM.h, new THREE.Vector3(0, ROOM.h / 2, ROOM.z1), Math.PI);          // south
+
+// ceiling beams for depth
+for (let i = 0; i < 4; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.16, 0.20), beamMat);
+  b.position.set(0, ROOM.h - 0.10, -3.5 + i * 1.7);
+  scene.add(b);
+}
+
+/* ---------- pinned notices on the north wall ---------- */
+const papers = [
+  { x: -1.42, y: 1.98, s: 0.72, r: 0.04 },
+  { x: -0.86, y: 1.94, s: 0.62, r: -0.06 },
+  { x: -0.34, y: 2.00, s: 0.54, r: 0.03 },
+  { x: 0.24, y: 1.92, s: 0.66, r: -0.03 },
+  { x: -1.24, y: 1.36, s: 0.52, r: 0.09 },
+  { x: 0.72, y: 1.96, s: 0.56, r: 0.06 },
+];
+for (const p of papers) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(p.s, p.s * 1.33),
+    new THREE.MeshStandardMaterial({ map: paperTex, transparent: true, roughness: 0.92, color: 0xbdb098 }));
+  m.position.set(p.x, p.y, ROOM.z0 + 0.035);
+  m.rotation.z = p.r;
+  scene.add(m);
+}
+
+/* ---------- props (built in Blender, GLB) ---------- */
+const gltfLoader = new GLTFLoader();
+const props = {};
+function place(obj, { pos = [0, 0, 0], rot = [0, 0, 0], scale = 1 }) {
+  obj.position.set(...pos);
+  obj.rotation.set(...rot);
+  obj.scale.setScalar(scale);
+  obj.updateMatrixWorld(true);
+  // the exported meshes are centred on their own origin: sit them on the floor
+  const bb = new THREE.Box3().setFromObject(obj);
+  obj.position.y -= bb.min.y;
+  obj.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      if (o.material) {
+        o.material.envMapIntensity = 0.4;
+        if (o.material.emissiveIntensity > 2.5) o.material.emissiveIntensity = 2.0;
+      }
+    }
+  });
+  scene.add(obj);
+  return obj;
+}
+function fitTo(obj, targetMax, axis = null) {
+  const b = new THREE.Box3().setFromObject(obj);
+  const size = b.getSize(new THREE.Vector3());
+  const d = axis ? size[axis] : Math.max(size.x, size.y, size.z);
+  const s = targetMax / d;
+  obj.scale.setScalar(s);
+  const b2 = new THREE.Box3().setFromObject(obj);
+  obj.position.y -= b2.min.y;
+  return { size, scale: s };
+}
+
+const PROPS = {
+  bench:      { pos: [0, 0, -3.55], rot: [0, 0, 0], s: 1 },
+  hearth:     { pos: [-3.42, 0, -0.40], rot: [0, Math.PI / 2, 0], s: 0.92 },
+  hearth_fire:{ pos: [-3.16, 0, -0.40], rot: [0, Math.PI / 2, 0], s: 0.92 },
+  cabinet:    { pos: [3.40, 0, -0.55], rot: [0, -Math.PI / 2, 0], s: 1 },
+  stool:      { pos: [2.72, 0, 1.02], rot: [0, 0.25, 0], s: 1 },
+  lamp:       { pos: [2.72, 0.47, 1.02], rot: [0, 0, 0], s: 1 },
+  bucket:     { pos: [-2.95, 0, 0.95], rot: [0, 0.4, 0], s: 1 },
+  toolrack:   { pos: [1.95, 1.52, -4.10], rot: [0, 0, 0], s: 1 },
+  anvil:      { pos: [-2.15, 0, -2.65], rot: [0, 0.55, 0], s: 1 },
+};
+let loadedCount = 0;
+const loadErrors = [];
+for (const [name, p] of Object.entries(PROPS)) {
+  gltfLoader.load(`assets/models/${name}.glb`, g => {
+    props[name] = place(g.scene, p);
+    loadedCount++;
+  }, undefined, (err) => { loadErrors.push(name + ': ' + err.message); console.warn('missing prop', name, err.message); });
+}
+
+/* ---------- the blade ---------- */
+const bladeMat = new THREE.MeshStandardMaterial({
+  color: 0xa8aeb4, roughness: 0.50, metalness: 0.62, emissive: 0x000000, emissiveIntensity: 1
+});
+let bladeModel = null;
+const bladeGroup = new THREE.Group();
+scene.add(bladeGroup);
+gltfLoader.load('assets/models/blade.glb', g => {
+  const m = g.scene;
+  fitTo(m, 0.98, 'x');
+  // the mesh is long on X, thin on Z: lay it flat (plane XY -> XZ)
+  m.rotation.x = -Math.PI / 2;
+  m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = bladeMat; } });
+  bladeGroup.add(m);
+  bladeModel = m;
+  // shelf copies
+  for (const d of DISPLAY) {
+    const c = m.clone(true);
+    const mat = new THREE.MeshStandardMaterial({
+      color: d.tint, roughness: 0.34, metalness: 0.85,
+      emissive: 0xffb060, emissiveIntensity: d.glow
+    });
+    c.traverse(o => { if (o.isMesh) { o.material = mat; o.castShadow = false; } });
+    const holder = new THREE.Group();
+    c.rotation.set(-Math.PI / 2, 0, 0);      // lay it flat
+    c.position.set(-0.42, 0.02, 0);
+    holder.add(c);
+    holder.position.set(d.onCounter ? 3.02 : 3.16, d.y, d.z);
+    holder.rotation.y = Math.PI / 2;          // run it along the shelf
+    scene.add(holder);
+    holder.updateMatrixWorld(true);
+    const hb = new THREE.Box3().setFromObject(holder);
+    holder.position.z -= (hb.min.z + hb.max.z) / 2 - d.z;   // centre it on the shelf
+    holder.position.y -= hb.min.y - d.y;
+    displayBlades.push(holder);
+  }
+});
+
+// three blades on the shop shelves (clones of the same generated mesh)
+const displayBlades = [];
+const DISPLAY = [
+  { y: 0.955, z: -1.18, tint: 0x8d8f92, glow: 0.0, onCounter: true },
+  { y: 1.125, z: -0.55, tint: 0xb9bcc2, glow: 0.30 },
+  { y: 1.605, z: -0.55, tint: 0xd8c48a, glow: 0.75 },
+];
+
+const BLADE_HOME = new THREE.Vector3(0.02, 0.888, -3.50);
+const BLADE_ROT = Math.PI - 0.30;
+bladeGroup.position.copy(BLADE_HOME);
+bladeGroup.rotation.y = BLADE_ROT;
+
+/* ---------- the hammer ---------- */
+const hammer = new THREE.Group();          // pivot sits at the grip, head points up
+scene.add(hammer);
+const HAM_REST = 0.35, HAM_HIT = 1.42;     // swing angle about Z (positive brings the head left/down)
+gltfLoader.load('assets/models/hammer.glb', g => {
+  const m = g.scene;
+  const b = new THREE.Box3().setFromObject(m);
+  const size = b.getSize(new THREE.Vector3());
+  const s = 0.62 / size.y;
+  m.scale.setScalar(s);
+  const b2 = new THREE.Box3().setFromObject(m);
+  m.position.set(-(b2.min.x + b2.max.x) / 2, -b2.min.y, -(b2.min.z + b2.max.z) / 2);
+  m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  hammer.add(m);
+});
+hammer.position.set(0.72, 0.860, -3.30);
+hammer.rotation.set(0, -0.28, HAM_REST);
+
+/* ---------- die ---------- */
+const die = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.055),
+  new THREE.MeshStandardMaterial({ color: 0xc9c0ad, roughness: 0.55, metalness: 0.05 }));
+die.castShadow = true;
+die.position.set(0.46, 0.915, -3.30);
+die.visible = false;
+scene.add(die);
+
+/* ---------- focus gauge (diegetic, on the bench) ---------- */
+const gauge = new THREE.Group();
+const plateMat = new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.82, metalness: 0.22 });
+const plate = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.062, 0.010), plateMat);
+gauge.add(plate);
+const trackMat = new THREE.MeshStandardMaterial({ color: 0x0b0a08, roughness: 0.7, emissive: 0x070604 });
+const track = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.016, 0.020), trackMat);
+gauge.add(track);
+const zoneMat = new THREE.MeshStandardMaterial({ color: 0x1b3320, emissive: 0x39ff7a, emissiveIntensity: 0.55, roughness: 0.5 });
+const zoneMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.022, 0.024), zoneMat);
+gauge.add(zoneMesh);
+const cursorMat = new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffd9a0, emissiveIntensity: 2.6 });
+const cursor = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.038, 0.028), cursorMat);
+gauge.add(cursor);
+gauge.position.set(-0.02, 1.115, -3.88);
+gauge.visible = false;
+scene.add(gauge);
+const GAUGE_W = 0.60;
+
+/* ---------- sparks ---------- */
+const SPARKS = 260;
+const sparkPos = new Float32Array(SPARKS * 3);
+const sparkVel = new Float32Array(SPARKS * 3);
+const sparkLife = new Float32Array(SPARKS);
+const sparkGeo = new THREE.BufferGeometry();
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+sparkGeo.setAttribute('aLife', new THREE.BufferAttribute(sparkLife, 1));
+function dotTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.22, 'rgba(255,226,170,0.92)');
+  grd.addColorStop(0.55, 'rgba(255,140,40,0.35)');
+  grd.addColorStop(1, 'rgba(255,90,10,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const sparkMat = new THREE.PointsMaterial({
+  color: 0xffc070, size: 0.030, transparent: true, opacity: 0.95, map: dotTexture(),
+  blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, alphaTest: 0.01
+});
+const sparks = new THREE.Points(sparkGeo, sparkMat);
+sparks.frustumCulled = false;
+scene.add(sparks);
+let sparkHead = 0;
+function burst(n, origin, power = 1) {
+  for (let k = 0; k < n; k++) {
+    const i = sparkHead++ % SPARKS;
+    sparkPos[i * 3] = origin.x + (rand() - .5) * 0.10;
+    sparkPos[i * 3 + 1] = origin.y + (rand() - .5) * 0.03;
+    sparkPos[i * 3 + 2] = origin.z + (rand() - .5) * 0.10;
+    const a = rand() * Math.PI * 2, up = 0.6 + rand() * 2.0 * power;
+    const sp = (0.5 + rand() * 1.9) * power;
+    sparkVel[i * 3] = Math.cos(a) * sp;
+    sparkVel[i * 3 + 1] = up;
+    sparkVel[i * 3 + 2] = Math.sin(a) * sp * 0.7;
+    sparkLife[i] = 1.0;
+  }
+  sparkHead = sparkHead % SPARKS;
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkGeo.attributes.aLife.needsUpdate = true;
+}
+function updateSparks(dt) {
+  let any = false;
+  for (let i = 0; i < SPARKS; i++) {
+    if (sparkLife[i] <= 0) continue;
+    any = true;
+    sparkLife[i] -= dt * 1.5;
+    sparkVel[i * 3 + 1] -= 7.5 * dt;
+    sparkPos[i * 3] += sparkVel[i * 3] * dt;
+    sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt;
+    sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
+    if (sparkPos[i * 3 + 1] < 0.895) { sparkPos[i * 3 + 1] = 0.895; sparkVel[i * 3 + 1] *= -0.25; sparkVel[i * 3] *= 0.7; sparkVel[i * 3 + 2] *= 0.7; }
+    if (sparkLife[i] <= 0) { sparkPos[i * 3 + 1] = -50; }
+  }
+  if (any) { sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.aLife.needsUpdate = true; }
+}
+
+/* ---------- audio ---------- */
+const AUD = {};
+for (const n of ['strike', 'hammer_whoosh', 'success', 'surge', 'shatter', 'damage', 'fire_loop',
+                 'coin', 'dice', 'select', 'ambient', 'purchase']) {
+  const a = new Audio(`assets/sfx/${n}.mp3`);
+  a.preload = 'auto';
+  if (n === 'fire_loop' || n === 'ambient') { a.loop = true; a.volume = n === 'fire_loop' ? 0.16 : 0.13; }
+  else a.volume = 0.55;
+  AUD[n] = a;
+}
+const MUSIC = new Audio('assets/music/forge_theme.mp3');
+MUSIC.loop = true; MUSIC.volume = 0.0; MUSIC.preload = 'auto';
+let audioOn = false;
+function startAudio() {
+  if (audioOn) return;
+  audioOn = true;
+  AUD.fire_loop.play().catch(() => {});
+  AUD.ambient.play().catch(() => {});
+  MUSIC.play().then(() => { MUSIC.volume = 0.0; fadeTo(MUSIC, 0.20, 3.0); }).catch(() => {});
+}
+function fadeTo(a, v, secs) {
+  const t0 = performance.now(), v0 = a.volume;
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / (secs * 1000));
+    a.volume = v0 + (v - v0) * k;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  step();
+}
+const sfx = (n, vol = 1) => {
+  const a = AUD[n]; if (!a) return;
+  const c = a.cloneNode(); c.volume = Math.min(1, (a.volume || 0.55) * vol);
+  c.play().catch(() => {});
+};
+
+/* ---------- game state ---------- */
+const BLADES = [
+  { name: 'scrap iron',   cost: 800,  base: 950,  strikes: 7 },
+  { name: 'folded steel', cost: 2400, base: 2500, strikes: 8 },
+  { name: 'starfall',     cost: 6800, base: 7000, strikes: 8 },
+];
+const valueOf = b => Math.round(b.base * Math.pow(1.36, b.tier));
+const taxOf = b => Math.min(80, Math.round(valueOf(b) * 0.01 + 10));
+
+const S = {
+  phase: Q.has('autostart') ? 'hub' : (Q.get('cam') === 'bench' ? 'bench' : 'title'),
+  mode: Q.get('cam') === 'bench' ? 'bench' : 'hearth',
+  pos: new THREE.Vector3(0, 0, -0.4),
+  yaw: 0,
+  gold: 2000,
+  held: { ...BLADES[0], tier: 0, strikes: 7 },
+  near: null,
+  charging: false,
+  charge: 0,
+  cursor: 0,
+  zoneLo: 0.70, zoneHi: 0.86,
+  chargeTime: 0.95,
+  focus: false,
+  outcome: null,
+  resolveT: 0,
+  t: 0,
+  fps: 0,
+  ended: null,
+  bladeScale: 1,
+  glow: 0,
+  hue: 0,
+  shake: 0,
+  hitDone: false,
+};
+// three fixed vantage points in the forge; A/D steps between them
+const STATIONS = {
+  hearth: { pos: new THREE.Vector3(-0.05, 1.56, -0.30), look: new THREE.Vector3(-3.45, 1.02, -0.42), fov: 44 },
+  bench:  { pos: new THREE.Vector3(0.08, 1.400, -2.12), look: new THREE.Vector3(0.02, 1.020, -3.60), fov: 45 },
+  shop:   { pos: new THREE.Vector3(0.55, 1.52, -0.55), look: new THREE.Vector3(3.30, 1.22, -0.55), fov: 56 },
+};
+const STATION_ORDER = ['hearth', 'bench', 'shop'];
+
+const HUB_EYE = 1.60, HUB_FOV = 50;
+const BENCH_CAM = STATIONS.bench;
+if (Q.get('cbz')) BENCH_CAM.pos.z = +Q.get('cbz');
+if (Q.get('cby')) BENCH_CAM.pos.y = +Q.get('cby');
+if (Q.get('cfov')) BENCH_CAM.fov = +Q.get('cfov');
+if (Q.get('clz')) BENCH_CAM.look.z = +Q.get('clz');
+if (Q.get('cly')) BENCH_CAM.look.y = +Q.get('cly');
+
+/* ---------- helpers ---------- */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+
+function setZone() {
+  const t = S.held ? S.held.tier : 0;
+  let width = clamp(0.185 - 0.007 * t, 0.100, 0.21);
+  if (S.quenched) width *= 1.9;
+  const lo = clamp(0.66 + 0.008 * t, 0.66, 0.78);
+  S.zoneLo = lo;
+  S.zoneHi = clamp(lo + width, 0, 1.0);
+  S.chargeTime = clamp(0.80 + 0.042 * t, 0.80, 1.30);
+  zoneMesh.scale.x = ((S.zoneHi - S.zoneLo) * GAUGE_W) / 0.12;
+  zoneMesh.position.x = ((S.zoneLo + S.zoneHi) / 2 - 0.5) * GAUGE_W;
+}
+
+function outcomeWeights(tier, focused) {
+  const t = clamp(tier, 0, 12);
+  let w = {
+    shatter: 0.035 + 0.016 * t,
+    damage: 0.090,
+    hold: 0.130,
+    surge: 0.085 + 0.006 * t,
+    rise: Math.max(0.22, 0.58 - 0.016 * t),
+  };
+  if (focused) { w.shatter *= 0.45; w.damage *= 0.7; w.surge *= 1.30; }
+  const sum = Object.values(w).reduce((a, b) => a + b, 0);
+  for (const k in w) w[k] /= sum;
+  return w;
+}
+
+function roll(tier, focused) {
+  const w = outcomeWeights(tier, focused);
+  let r = rand(), acc = 0;
+  for (const k of ['shatter', 'damage', 'hold', 'surge', 'rise']) {
+    acc += w[k];
+    if (r <= acc) return k;
+  }
+  return 'rise';
+}
+let lastProbs = null;
+
+/* ---------- UI ---------- */
+const el = id => document.getElementById(id);
+const ui = { title: el('title'), hint: el('hint'), corner: el('corner'), gold: el('gold'),
+             tierTag: el('tierTag'), prompt: el('prompt'), flash: el('flash') };
+function hintFor() {
+  if (S.phase === 'title') return 'space to begin';
+  if (S.phase === 'end') return 'R to begin again';
+  if (S.mode === 'bench') return 'hold space to wind up · release in the green';
+  return 'A D step along the forge · space act · R restart';
+}
+function promptFor() {
+  if (S.mode === 'bench' || S.phase === 'title' || S.phase === 'end') return '';
+  if (S.mode === 'shop') return S.held ? 'space — sell for ' + valueOf(S.held).toLocaleString() : 'space — buy a blade';
+  if (S.mode === 'hearth') return S.held ? 'space — quench (' + Math.round(valueOf(S.held) * 0.15).toLocaleString() + ')' : 'the hearth breathes';
+  return '';
+}
+function flash(v = 0.5, ms = 130) {
+  ui.flash.style.transition = 'none';
+  ui.flash.style.opacity = String(v);
+  requestAnimationFrame(() => {
+    ui.flash.style.transition = `opacity ${ms}ms ease-out`;
+    ui.flash.style.opacity = '0';
+  });
+}
+
+/* ---------- input ---------- */
+const keys = new Set();
+const tapped = new Set();          // keys pressed since the last frame (a quick tap must not be lost)
+let spaceDown = false, spaceEdge = false, prevSpace = false;
+addEventListener('keydown', e => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (!e.repeat) { keys.add(e.code); tapped.add(e.code); }
+  if (e.code === 'KeyR') restart();
+  startAudio();
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('pointerdown', startAudio, { once: true });
+
+function pad() { return navigator.getGamepads?.()[0] || null; }
+
+/* ---------- actions ---------- */
+function restart() {
+  S.gold = 2000; S.held = { ...BLADES[0], tier: 0, strikes: BLADES[0].strikes }; S.phase = Q.has('autostart') ? 'hub' : 'title'; S.mode = 'hearth';
+  S.ended = null; S.outcome = null; S.charging = false; S.charge = 0;
+  S.quenched = false;
+  bladeGroup.visible = true;
+  sizeBenchUI(false);
+  ui.corner.style.opacity = '1';
+  ui.title.style.opacity = Q.has('autostart') ? '0' : '1';
+}
+
+function shift(dir) {
+  if (S.mode === 'bench' && S.outcome) return;
+  const i = STATION_ORDER.indexOf(S.mode);
+  const n = STATION_ORDER[(i + dir + STATION_ORDER.length) % STATION_ORDER.length];
+  setStation(n);
+  sfx('select', 0.55);
+}
+function setStation(name) {
+  S.mode = name;
+  S.phase = name === 'bench' ? 'bench' : 'hub';
+  S.charging = false; S.charge = 0;
+  sizeBenchUI(name === 'bench');
+  if (name === 'bench') setZone(); else { die.visible = false; }
+}
+function beginBench() { setStation('bench'); }
+function sizeBenchUI(on) {
+  gauge.visible = on;
+  if (!on) { die.visible = false; }
+}
+
+function buyOrSell() {
+  if (S.held) {
+    const v = valueOf(S.held);
+    S.gold += v;
+    sfx('coin', 1.0);
+    const soldTier = S.held.tier;
+    S.held = null;
+    bladeGroup.visible = true;
+    if (soldTier >= 10) endRun('masterwork');
+    else if (S.gold < BLADES[0].cost) endRun('broke');
+    return { sold: v, tier: soldTier };
+  }
+  const b = BLADES.find(b => S.gold >= b.cost);
+  if (!b) return null;
+  S.gold -= b.cost;
+  S.held = { ...b, tier: 0, strikes: b.strikes };
+  S.quenched = false;
+  sfx('purchase', 0.9);
+  return { bought: b.name };
+}
+
+function endRun(kind) {
+  S.phase = 'end'; S.ended = kind;
+  S.mode = 'hearth';
+  sizeBenchUI(false);
+  ui.hint.textContent = kind === 'masterwork' ? 'a masterwork, sold — R to begin again' : 'the gold ran out — R to begin again';
+}
+
+function startCharge() {
+  if (S.phase !== 'bench' || S.charging || S.outcome) return;
+  if (!S.held) return;
+  if (S.gold < taxOf(S.held)) return;      // the forge wants its fee first
+  S.charging = true; S.charge = 0; S.focus = false;
+  sfx('hammer_whoosh', 0.55);
+}
+
+function releaseCharge() {
+  if (!S.charging) return;
+  S.charging = false;
+  const inZone = S.charge >= S.zoneLo && S.charge <= S.zoneHi;
+  const late = S.charge > S.zoneHi;
+  S.focus = inZone;
+  S.gold = Math.max(0, S.gold - taxOf(S.held));
+  updateReadouts();
+  lastProbs = outcomeWeights(S.held.tier, inZone);
+  S.outcome = { kind: roll(S.held.tier, inZone), t: 0, struck: false };
+  S.shake = late ? 0.5 : 1.0;
+  die.visible = true;
+  die.position.set(0.46, 0.915, -3.30);
+  die.userData.spin = new THREE.Vector3(18 + rand() * 14, 12 + rand() * 12, 20 + rand() * 16);
+  die.userData.vel = new THREE.Vector3(-0.9 - rand() * 0.5, 0.35, -0.5 - rand() * 0.4);
+}
+
+function applyOutcome() {
+  const o = S.outcome; if (!o) return;
+  const b = S.held; if (!b) return;
+  if (o.kind === 'rise') {
+    b.tier = Math.min(14, b.tier + 1);
+    sfx('success', 1.0); flash(0.16, 200);
+    burn(0.5, 1.0);
+  } else if (o.kind === 'surge') {
+    const jump = 2 + (rand() < 0.4 ? 1 : 0);
+    b.tier = Math.min(14, b.tier + jump);
+    sfx('surge', 1.0); flash(0.30, 380);
+    burn(1.6, 1.9);
+    S.surgedAt = S.t;
+  } else if (o.kind === 'hold') {
+    b.strikes--;
+    sfx('damage', 0.35); flash(0.07, 120);
+  } else if (o.kind === 'damage') {
+    b.tier = Math.max(0, b.tier - 1); b.strikes--;
+    sfx('damage', 1.0); flash(0.16, 200);
+    burn(0.25, 0.8);
+  } else if (o.kind === 'shatter') {
+    b.strikes--;
+    sfx('shatter', 1.0); flash(0.5, 260);
+    burst(70, bladeGroup.position, 1.6);
+    S.shattered = true;
+    S.held = null;
+    bladeGroup.visible = false;
+  }
+  S.outcome = { ...o, done: true, t: 0 };
+  S.quenched = false;
+  setZone();
+  updateReadouts();
+}
+
+let burnT = 0, burnAmp = 0;
+function burn(col, amp) { burnT = 1.0; burnAmp = amp; }
+
+function updateReadouts() {
+  ui.gold.textContent = S.gold.toLocaleString();
+  if (S.held) {
+    ui.tierTag.textContent = '+' + S.held.tier + '  ·  ' + S.held.strikes + ' ⚒';
+  } else {
+    ui.tierTag.textContent = '';
+  }
+}
+
+/* ---------- camera rigs ---------- */
+const camPos = new THREE.Vector3(0, HUB_EYE, 0.55);
+const camLook = new THREE.Vector3(0, HUB_EYE * 0.92, -1);
+let camFov = HUB_FOV;
+const TOPVIEW = Q.has('top');
+function updateCamera(dt) {
+  if (TOPVIEW) {
+    camera.position.set(0.3, 7.2, -0.7);
+    camera.fov = 62; camera.updateProjectionMatrix();
+    camera.lookAt(0.3, 0, -0.75);
+    camera.rotation.z = 0;
+    return;
+  }
+  let tPos, tLook, tFov;
+  const st = STATIONS[S.mode] || STATIONS.hearth;
+  tPos = st.pos; tLook = st.look; tFov = st.fov;
+  camPos.x = damp(camPos.x, tPos.x, 9, dt);
+  camPos.y = damp(camPos.y, tPos.y, 9, dt);
+  camPos.z = damp(camPos.z, tPos.z, 9, dt);
+  camLook.x = damp(camLook.x, tLook.x, 6, dt);
+  camLook.y = damp(camLook.y, tLook.y, 6, dt);
+  camLook.z = damp(camLook.z, tLook.z, 6, dt);
+  camFov = damp(camFov, tFov, 5, dt);
+  camera.position.copy(camPos);
+  // impact shake
+  if (S.shake > 0.001) {
+    const s = S.shake * 0.016;
+    camera.position.x += (rand() - .5) * s;
+    camera.position.y += (rand() - .5) * s;
+    S.shake *= Math.exp(-7 * dt);
+  }
+  camera.fov = camFov;
+  camera.updateProjectionMatrix();
+  camera.lookAt(camLook);
+}
+
+/* ---------- update ---------- */
+const clock = new THREE.Clock();
+let fpsAcc = 0, fpsN = 0;
+let tapL = false, tapR = false;
+
+function update(dt) {
+  S.t += dt;
+  const P = pad();
+
+  // ---- title ----
+  if (S.phase === 'title') {
+    ui.title.style.opacity = '1';
+    ui.corner.style.opacity = '0';
+    if (keys.has('Space') || keys.has('Enter') || P?.buttons[0]?.pressed) {
+      S.phase = 'hub'; ui.title.style.opacity = '0'; ui.corner.style.opacity = '1';
+      startAudio();
+    }
+  } else {
+    ui.title.style.opacity = '0';
+    ui.corner.style.opacity = '1';
+  }
+
+  // ---- hub movement ----
+  const padAx = pad()?.axes?.[0] || 0;
+  const moveL = tapL || (padAx < -0.6 && !S._padL);
+  const moveR = tapR || (padAx > 0.6 && !S._padR);
+  S._padL = padAx < -0.6; S._padR = padAx > 0.6;
+
+  if (S.phase !== 'title' && !S.outcome) {
+    if (moveL) shift(-1);
+    if (moveR) shift(1);
+    if (spaceEdge && S.phase === 'hub' && S.mode !== 'bench') {
+      if (S.mode === 'hearth') quench();
+      else if (S.mode === 'shop') buyOrSell();
+    }
+  }
+  S.near = S.mode;
+  S.walking = false;
+
+  // ---- bench interaction ----
+  if (S.mode === 'bench') {
+    if (S.charging) {
+      S.charge += dt / S.chargeTime;
+      if (S.charge > 1.28) releaseCharge();
+    }
+    if (spaceEdge && !S.outcome) startCharge();
+    if (!spaceDown && S.charging) releaseCharge();
+  }
+
+  // ---- outcome timeline ----
+  if (S.outcome) {
+    S.outcome.t += dt;
+    if (!S.outcome.struck && S.outcome.t > 0.16) {
+      S.outcome.struck = true;
+      sfx('strike', 1.0);
+      burst(46, new THREE.Vector3(0.24, 0.93, -3.42), 1.0);
+      S.shake = Math.max(S.shake, 0.9);
+    }
+    if (!S.outcome.done && S.outcome.t > 0.62) applyOutcome();
+    if (S.outcome.done && S.outcome.t > 1.15) {
+      S.outcome = null;
+      die.visible = false;
+      if (!S.held) {
+        setStation('hearth');
+        if (S.gold < BLADES[0].cost) endRun('broke');
+      }
+      else if (S.held.strikes <= 0) {
+        // spent: must sell
+        S.spent = true;
+      }
+    }
+  }
+
+  // ---- die tumble ----
+  if (die.visible) {
+    const u = die.userData;
+    u.vel.y -= 3.0 * dt;
+    die.position.addScaledVector(u.vel, dt);
+    if (die.position.y < 0.900) { die.position.y = 0.900; u.vel.y *= -0.4; u.vel.x *= 0.82; u.vel.z *= 0.82; }
+    die.rotation.x += u.spin.x * dt; die.rotation.y += u.spin.y * dt; die.rotation.z += u.spin.z * dt;
+    u.spin.multiplyScalar(1 - 1.6 * dt);
+  }
+
+  // ---- hammer animation (bench only) ----
+  hammer.visible = S.mode === 'bench';
+  if (S.charging) {
+    const k = clamp(S.charge, 0, 1.25);
+    hammer.rotation.z = damp(hammer.rotation.z, HAM_REST - k * 0.34, 12, dt);   // winds further back
+  } else if (S.outcome && S.outcome.t < 0.42) {
+    const k = clamp(S.outcome.t / 0.42, 0, 1);
+    const swing = Math.sin(Math.pow(k, 0.5) * Math.PI * 0.5);                  // accelerate into the blow
+    hammer.rotation.z = HAM_REST + (HAM_HIT - HAM_REST) * swing;
+  } else {
+    hammer.rotation.z = damp(hammer.rotation.z, HAM_REST, 5.5, dt);
+  }
+
+  // ---- blade glow by tier ----
+  if (S.held) {
+    const t = S.held.tier;
+    const base = t <= 1 ? 0.0 : Math.min(2.0, (t - 1) * 0.165);
+    S.glow = damp(S.glow, base + (S.charging ? 0.35 : 0), 4, dt);
+    const surgeAge = S.surgedAt ? S.t - S.surgedAt : 99;
+    if (surgeAge < 2.2) {
+      S.hue = (S.hue + dt * 0.9) % 1;
+      bladeMat.emissive.setHSL(S.hue, 0.85, 0.62);
+      bladeMat.emissiveIntensity = (1 - surgeAge / 2.2) * 2.2 + 0.45;
+      benchGlow.color.setHSL(S.hue, 0.9, 0.6);
+    } else {
+      const hot = clamp((S.held.tier - 2) / 10, 0, 1);
+      bladeMat.emissive.setRGB(1.0, 0.70 + 0.26 * hot, 0.40 + 0.50 * hot);
+      bladeMat.emissiveIntensity = S.glow;
+      benchGlow.color.set(0xffd0a0);
+    }
+    benchGlow.intensity = 0.30 + S.glow * 0.85;
+    gauge.visible = true;
+    cursor.position.x = (clamp(S.charge, 0, 1) - 0.5) * GAUGE_W;
+    cursorMat.emissiveIntensity = 2.2 + Math.sin(S.t * 22) * 0.8;
+    const inz = S.charge >= S.zoneLo && S.charge <= S.zoneHi;
+    zoneMat.emissiveIntensity = inz ? 2.6 : 0.55;
+  } else {
+    gauge.visible = false;
+    benchGlow.intensity = damp(benchGlow.intensity, 0, 4, dt);
+  }
+
+  // blade sits on the bench only in bench mode
+  bladeGroup.visible = !!(S.held) && !S.shattered;
+  if (S.shattered && !S.outcome) S.shattered = false;
+
+  // ---- fire flicker ----
+  fireLight.intensity = 8 + Math.sin(S.t * 9.3) * 1.2 + Math.sin(S.t * 21.7) * 0.6;
+  fireLight.position.z = -0.30 + Math.sin(S.t * 5.1) * 0.03;
+
+  // ---- burn / flash on the blade ----
+  if (burnT > 0) { burnT = Math.max(0, burnT - dt * 1.4); }
+
+  // ---- sparks ----
+  updateSparks(dt);
+
+  // ---- ui ----
+  ui.hint.textContent = hintFor();
+  ui.prompt.textContent = promptFor();
+  ui.prompt.style.opacity = promptFor() ? '0.9' : '0';
+
+  prevSpace = spaceDown;
+}
+
+/* ---------- main loop ---------- */
+function frame() {
+  const dt = Math.min(clock.getDelta(), 1 / 20);
+  spaceDown = keys.has('Space') || !!(pad()?.buttons[0]?.pressed);
+  spaceEdge = tapped.has('Space') || (spaceDown && !prevSpace);
+  tapL = tapped.has('KeyA') || tapped.has('ArrowLeft');
+  tapR = tapped.has('KeyD') || tapped.has('ArrowRight');
+  tapped.clear();
+
+  update(dt);
+  updateCamera(dt);
+  grade.uniforms.uTime.value += dt;
+  composer.render();
+
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5) { S.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+
+  requestAnimationFrame(frame);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- quench at the hearth ---------- */
+S.quenched = false;
+function quench() {
+  if (!S.held) return;
+  const cost = Math.round(valueOf(S.held) * 0.15);
+  if (S.gold < cost) return;
+  S.gold -= cost;
+  S.held.strikes += 2;
+  S.quenched = true;
+  sfx('select', 1.0); flash(0.10, 320);
+  burst(24, new THREE.Vector3(-3.4, 1.0, -0.35), 0.7);
+  updateReadouts();
+}
+
+/* ---------- state contract ---------- */
+window.__game = {
+  get loaded() {
+    const out = {};
+    for (const [k, o] of Object.entries(props)) {
+      const b = new THREE.Box3().setFromObject(o);
+      out[k] = { min: b.min.toArray().map(v => +v.toFixed(2)), max: b.max.toArray().map(v => +v.toFixed(2)) };
+    }
+    return { count: loadedCount, errors: loadErrors, boxes: out };
+  },
+  get state() {
+    const b = S.held;
+    return {
+      phase: S.phase, mode: S.mode,
+      station: S.mode, x: 0, z: 0,
+      gold: S.gold, near: S.near,
+      held: !!b, tier: b ? b.tier : null, strikes: b ? b.strikes : null,
+      value: b ? valueOf(b) : 0, tax: b ? taxOf(b) : 0,
+      charging: S.charging, charge: +S.charge.toFixed(3),
+      cursor: +clamp(S.charge, 0, 1).toFixed(3),
+      zoneLo: +S.zoneLo.toFixed(3), zoneHi: +S.zoneHi.toFixed(3),
+      focus: S.focus, outcome: S.outcome ? S.outcome.kind : null,
+      outcomeDone: !!(S.outcome && S.outcome.done),
+      probs: lastProbs, ended: S.ended, fps: S.fps, t: +S.t.toFixed(2),
+    };
+  }
+};
+
+restart();
+updateReadouts();
+// URL debug params must be applied after restart(), which resets the run
+if (Q.get('station') && STATIONS[Q.get('station')]) setStation(Q.get('station'));
+if (Q.get('tier')) {
+  S.held = { ...BLADES[1], tier: +Q.get('tier'), strikes: 5 };
+  S.mode = 'bench'; S.phase = 'bench';
+  S.gold = Q.get('gold') ? +Q.get('gold') : S.gold;
+  sizeBenchUI(true); setZone(); updateReadouts();
+} else if (Q.get('cam') === 'bench') {
+  S.mode = 'bench'; S.phase = 'bench';
+  sizeBenchUI(true); setZone();
+}
+ui.corner.style.opacity = Q.has('autostart') || Q.get('cam') === 'bench' || Q.get('tier') ? '1' : '0';
+frame();
+</script>
+</body>
+</html>

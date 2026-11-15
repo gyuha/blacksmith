@@ -1,0 +1,175 @@
+[
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "strike",
+  "seconds": 4.5,
+  "arguments": {
+   "text": "heavy blacksmith hammer striking a glowing steel blade on an anvil, one single sharp metallic clang with a short iron ring and a soft spark hiss tail",
+   "duration_seconds": 2.5,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/strike.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "hammer_whoosh",
+  "seconds": 4.1,
+  "arguments": {
+   "text": "a heavy blacksmith hammer swinging fast through air, one low whoosh with a leather grip creak, no impact",
+   "duration_seconds": 1.4,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/hammer_whoosh.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "success",
+  "seconds": 5.6,
+  "arguments": {
+   "text": "a small bright metal chime rising in pitch, one clean sparkle of tempered steel, short and warm",
+   "duration_seconds": 1.8,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/success.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "surge",
+  "seconds": 5.5,
+  "arguments": {
+   "text": "a dazzling cascade of glassy metal chimes blooming upward with a low warm swell underneath, magical forge great success, 3 seconds",
+   "duration_seconds": 3.4,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/surge.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "shatter",
+  "seconds": 5.5,
+  "arguments": {
+   "text": "brittle steel snapping and exploding into shards on stone, one violent crack followed by small tinkling fragments, no music",
+   "duration_seconds": 2.6,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/shatter.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "damage",
+  "seconds": 5.0,
+  "arguments": {
+   "text": "a dull iron crack and a low gritty grind as a blade edge chips, short and ugly",
+   "duration_seconds": 1.6,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/damage.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "fire_loop",
+  "seconds": 6.1,
+  "arguments": {
+   "text": "a steady forge fire burning in a stone hearth, low crackling embers and soft air draft, seamless loop",
+   "duration_seconds": 6,
+   "prompt_influence": 0.7
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/fire_loop.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "coin",
+  "seconds": 4.4,
+  "arguments": {
+   "text": "a handful of heavy gold coins clinking into a wooden tray, close and warm",
+   "duration_seconds": 1.4,
+   "prompt_influence": 0.7,
+   "loop": false
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/coin.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "dice",
+  "seconds": 4.8,
+  "arguments": {
+   "text": "two bone dice tumbling and settling on a wooden bench, rattling clatter then a final tap",
+   "duration_seconds": 2.2,
+   "prompt_influence": 0.7,
+   "loop": false
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/dice.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "select",
+  "seconds": 4.0,
+  "arguments": {
+   "text": "a dry wooden tong tapped once against a leather-wrapped grip, small and close",
+   "duration_seconds": 0.9,
+   "prompt_influence": 0.7,
+   "loop": false
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/select.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "ambient",
+  "seconds": 6.0,
+  "arguments": {
+   "text": "a quiet empty stone forge at night, faint fire crackle far away, low airy room tone, seamless loop",
+   "duration_seconds": 10,
+   "prompt_influence": 0.7,
+   "loop": true
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/ambient.mp3"
+  ]
+ },
+ {
+  "endpoint": "fal-ai/elevenlabs/sound-effects/v2",
+  "name": "purchase",
+  "seconds": 4.7,
+  "arguments": {
+   "text": "a heavy blade lifted off a wooden rack and set down on a bench with a small brass rattle",
+   "duration_seconds": 1.8,
+   "prompt_influence": 0.7,
+   "loop": false
+  },
+  "prompt": null,
+  "files": [
+   "assets/sfx/purchase.mp3"
+  ]
+ }
+]

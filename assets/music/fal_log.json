@@ -1,0 +1,15 @@
+[
+ {
+  "endpoint": "elevenlabs/music/v2.5",
+  "name": "forge_theme",
+  "seconds": 12.1,
+  "arguments": {
+   "music_length_ms": 90000,
+   "force_instrumental": true
+  },
+  "prompt": "Slow dark ambient forge music. A low sustained cello drone, a sparse plucked zither figure, distant anvil taps in a slow heartbeat, warm analogue tape hiss. Melancholic, patient, sparse, no drums, no vocals. Sits quietly under sound effects.",
+  "files": [
+   "assets/music/forge_theme.mp3"
+  ]
+ }
+]
