@@ -1,162 +1,141 @@
 # THE TEMPER
 
-A browser game rebuilt from `forgetax.mp4`, played with a keyboard, made with Three.js.
-You stand at a forge bench. You lay a blade on the anvil, pay the forge's fee, and swing.
-The number on the blade goes up — until it doesn't.
+`forgetax.mp4`를 보고 다시 만든 브라우저 게임입니다. Three.js 단일 파일(`index.html`)이고 빌드 단계가 없습니다.
+대장간 안을 FPS로 걸어 다니며 **주문을 받고 → 재료를 집어 → 화로에서 달구고 → 모루에서 두드려 → 납품**합니다.
 
-## What it was rebuilt from
+## 원본과 참고 범위
 
-`forgetax.mp4` is 91.8 minutes (5,509 s, 1280×720, 30 fps) of a released game, **FORGE TAX**.
-`gameplay.txt` was not in the repo, so the design came from the video itself:
+`forgetax.mp4`는 출시된 게임 *FORGE TAX*를 녹화한 91.8분짜리 영상(1280×720, 30 fps)입니다.
+`gameplay.txt`는 저장소에 없어서 영상 분석(`study/`, `refs/`)과 `SPEC.md`를 기준으로 삼았습니다.
 
-- `study/` — frames every second of the forge segment (source t=1730–1860), contact sheet, palette, cut report
-  (`study_video.py` on a 130 s cut of the source).
-- `refs/` — six full-res stills used as the style references for every generated image.
-- `SPEC.md` — the written spec: camera, hero, mechanic, key moment, world, look.
+영상에서는 **공간의 기능 배치**만 참고했습니다. 이름, 무기명, 손님 캐릭터, UI 플라크는 가져오지 않았고,
+방 구성과 소품은 독자적으로 만든 오마주입니다. 영상 컨택트 시트는 `refs/scan_sheet_01.jpg`, `refs/scan_sheet_02.jpg`입니다.
 
-The measured shape of the source: 80 % of the clip is a locked-off first-person bench view — blade diagonally in
-the lower third, iron hammer entering from the right, dark olive brick wall with pinned calendars behind, a
-translucent plaque floating over the bench. Palette: `#0e0e0d #161713 #24241a #353728 #464837 #555946` — olive
-graphite and near-black, warm amber key light, crimson only on destruction, prismatic only on the best proc.
+## 방 구성
 
-This game is an **original homage**, as agreed: same framing, palette, materials and gamble; its own world, item
-names, gauge, room and no FORGE TAX branding or copied UI strings.
+방은 10 × 8 m이고 중심이 원점, `+x`가 동쪽, `+z`가 남쪽입니다.
 
-## Controls
+```
+              북
+   ┌──────────────┬──────────────┐
+   │  주문 창구    │  옵션 교환    │
+ 서 │ (order)      │ (exchange)   │  동
+   │              │              │
+   │ 철창 문·무기   │              │  모루 작업대(craft)
+   │ 거치대        │              │  화로(forge)
+   │ (gate, rack) │              │
+   └──────────────┴──────────────┘
+              진열장(display)
+                 남
+```
 
-| Key | Does |
-|---|---|
-| `Space` | start · buy / sell at the case · quench at the hearth |
-| hold `Space` at the bench | wind the hammer up; a cursor sweeps the brass rule |
-| release `Space` | strike. Release while the cursor is in the **green** and the roll is biased your way |
-| `A` `D` / `←` `→` | step between hearth → bench → case |
-| `R` | restart |
-| gamepad | left stick steps, A acts |
-
-**The loop.** Buy or take a blade → bench: each strike costs a small forge fee and rolls
-shatter / damage / hold / rise / surge. A **surge** (the source's 대성공) jumps 2–3 tiers with a prismatic flare.
-Only *failures* spend the blade's durability; the hearth can quench it for two more attempts.
-Sell at the case. Sell a blade at **+10** and the run ends a masterwork.
-
-**URL parameters:** `?autostart` skips the title, `?seed=N` fixes every roll, `?tier=N` (debug) starts holding a
-blade at that tier, `?station=hearth|bench|shop`, `?top=1` (debug) overhead view.
-
-**State contract** for the playtest: `window.__game.state` → phase, station, gold, held, tier, strikes, value,
-tax, charging, cursor, zoneLo, zoneHi, focus, outcome, ended, fps.
-
-## The look
-
-ACES Filmic, one grade (lift + warm gain + 20 % harmonise toward luminance), bloom with a high threshold,
-exponential fog, vignette, grain, and a slight chromatic fringe on the glow. The blade's glow is the readability
-system: dull steel → warm edge → white-hot → prismatic. Only the blade, the fire and the lamp bloom.
-
-## Assets — every one generated on fal
-
-**Images were made with `openai/gpt-image-2.5/flare/edit`**, the model requested for this project (7 calls),
-each one fed a frame of the video as a reference. Textures: brick, bench top, floor planks, pinned calendar.
-Concepts: the blade, the hammer.
-
-| Asset | Endpoint | Notes |
+| 구역 | 위치 | 하는 일 |
 |---|---|---|
-| `textures/brick.png` | `openai/gpt-image-2.5/flare/edit` | seamless, 3×3 tiling checked |
-| `textures/benchwood.png` | `openai/gpt-image-2.5/flare/edit` | seamless |
-| `textures/floorplank.png` | `openai/gpt-image-2.5/flare/edit` | seamless |
-| `textures/paper_cal.png` | `openai/gpt-image-2.5/flare/edit` | transparent background, calendar with X-marks |
-| `models/sword_concept.png` | `openai/gpt-image-2.5/flare/edit` | reference sheet for the blade |
-| `models/hammer_concept.png` | `openai/gpt-image-2.5/flare/edit` | reference sheet for the hammer |
-| `models/blade.glb` | `meshy/v7.1/image-to-3d` | 11.3k tris → decimated + JPEG-packed to 632 KB |
-| `models/hammer.glb` | `meshy/v7.1/image-to-3d` | decimated to 586 KB |
-| 12 sound effects | `fal-ai/elevenlabs/sound-effects/v2` | strike, whoosh, success, surge, shatter, damage, fire loop, coins, dice, select, purchase, room tone |
-| `music/forge_theme.mp3` | `elevenlabs/music/v2.5` | instrumental, 90 s, low cello + zither |
+| `order` | 북쪽 벽 서쪽 | 주문 받기, 완성품 납품 |
+| `exchange` | 북쪽 벽 동쪽 | 골드로 다음 타격 보정(tonic) 구입 |
+| `craft` | 동쪽 | 재료 상자에서 철 막대 집기, 모루에서 타격 |
+| `forge` | 동쪽 | 화로에서 가열 |
+| `display` | 남쪽 | 완성품 진열·판매 |
+| `gate`, `rack` | 서쪽 | 철창 문(장식), 무기 거치대(완성품 걸기) |
 
-Everything else is **built in Blender** (`build_props.py`) instead of bought: bench, anvil, arched hearth, ember
-bed, shop cabinet, stool, oil lamp, coal bucket, tool rack — then exported to GLB. Earlier exploratory
-`fal-ai/nano-banana-pro/edit` and `fal-ai/birefnet/v2` calls are still in `assets/*/fal_log.json`.
+## 조작
 
-**Calls:** 30 logged fal jobs (+1 meshy job whose log line was lost when the tool timed out) — 12 SFX,
-7 image edits, 5 early image calls, 3 cutouts, 2 image-to-3D, 1 music. Estimated cost ≈ **$4**, not metered.
-One generated spark sprite and the vignette/grain are shader work, not assets.
+| 입력 | 동작 |
+|---|---|
+| `W` `A` `S` `D` | 이동 |
+| 마우스 (클릭 후 포인터락) / `←` `→` `↑` `↓` | 시점 |
+| `E` | 상호작용 (집기·가열·주문 수락·납품 등) |
+| `Space` 길게 → 떼기 | 모루 앞에서 타격. 게이지의 밴드 안에서 떼면 성공 쪽으로 보정 |
+| `R` | 재시작 (같은 시드면 같은 주문과 판정) |
 
-## Proof it plays
+상호작용은 엔진이 플레이어와 구역 중심의 거리가 구역 `radius` 이내일 때만 처리합니다.
 
-- `takes/take_final.mp4` — **30.8 s, 1848 frames, 60.0 fps, 0 console errors**, recorded with
-  `record_play.mjs` from `?autostart&seed=3` while `play.mjs` played it with the keyboard only.
-- `takes/take_best10.mp4` — the liveliest 10 s window (`best_window.py`: 5.75 s → 15.75 s).
-- The run, from the scenario's own log: surge on the first strike (+0 → +3), a **shatter** at 7.6 s, a fresh
-  blade climbing 0 → 6, prismatic surges at 25.8 s (+6 → +9) and 28.5 s (+9 → +12), sold at ~31 s for
-  **38,787 gold — a masterwork**.
-- `pairs/` — three side-by-side pairs against the source, at the same spots each time:
-  `pair_1757` (bench, blade resting vs. mid-strike), `pair_1800` (the blazing high-tier blade), `pair_1762`
-  (the hearth). Left is always the video, right is the game.
+## 게임 루프
 
-## What still differs from the video
+```
+order(E 수락) → craft(E 재료) → forge(E 가열) → craft(Space 타격) → order(E 납품) → 골드
+                                      ↑ 등급 부족하면 다시 타격·재가열 ┘
+```
 
-- **The blade model** is slimmer and paler than the source's broad steel blade with its dark fuller and
-  red-brown grip; the fuller reads weakly.
-- **The panel.** The source floats a big translucent plaque of stats and percentages. Deliberately not copied —
-  the game shows one small brass gauge and two corner counters instead (gold, tier, strikes).
-- **The hearth** is brick with a stylised arch and cone-shaped flames; the source's is cut grey stone with a
-  heavy mantel, a bentwood chair and tools leaning beside it.
-- **The shop** is one cabinet — two blades on its shelves, one on the counter; the source has a whole wall of
-  lit display cases and a shopkeeper.
-- **The room** is much smaller and emptier than the source's forge, which is dense with props.
-- **Scale of the gamble**: one blade, three station cameras, ~30 s to a masterwork. The source is a
-  92-minute economy with dice, boosters and repair items; those systems are not here.
-- The grade is a little warmer and more saturated in the mid-tones than the source's olive graphite.
+- 시작 골드는 500입니다. 납품 보상은 `pay + 90 × (달성 등급 − 요구 등급)`입니다.
+- 타격 결과는 `shatter`(파괴) / `damage`(−1) / `hold` / `rise`(+1) / `surge`(+2~+3, 프리즘 광채)입니다. 타격 1회에 12 g이 듭니다.
+- 등급은 글로우로 표현합니다: 없음 → 얇은 흰 선 → 따뜻한 금색 → 백열 → 프리즘.
 
-## Running it
+URL 파라미터: `?autostart`(타이틀 건너뛰기), `?seed=N`(주문·판정 고정), `?cam=x,y,z,yaw,pitch`(디버그 카메라).
+세부 규칙과 `window.__game.state` 계약은 [`SPEC.md`](SPEC.md)에 있습니다.
+
+## 실행
 
 ```bash
-cd /Users/gyuha/workspace/blacksmith
-python3 -m http.server 8123          # any static server; 8000 was taken on this machine
-open http://127.0.0.1:8123/index.html
+task play     # 0.0.0.0:8123 으로 서버를 띄우고 브라우저를 엽니다
+task serve    # 서버만 (같은 네트워크의 다른 PC에서도 접속 가능)
 ```
 
-Replay the take:
+`task serve`와 `task play`는 `0.0.0.0`에 바인드하므로 **같은 네트워크의 누구나 이 폴더 전체를 읽을 수 있습니다.**
+공용 네트워크에서는 쓰지 마세요. 시작할 때 접속 주소와 경고가 출력됩니다.
 
-```bash
-node .agents/skills/video-to-game/scripts/record_play.mjs \
-  "http://127.0.0.1:8123/index.html?autostart&seed=3" play.mjs \
-  -o takes/take.mp4 --seconds 40 --size 1280x720
+정적 서버라면 무엇이든 됩니다: `python3 -m http.server 8123` 후 `http://127.0.0.1:8123/index.html`.
+
+## 검증
+
+각 검사는 스스로 서버를 띄우고 끝나면 정리합니다(`probe/with_server.sh`, `127.0.0.1` 바인드).
+
+| task | 검사 내용 |
+|---|---|
+| `task check:boot` | 헤드리스로 6초 로드, 콘솔 에러 0, fps ≥ 55. 실제로 요청된 GLB 목록을 `probe/models_loaded.txt`에 기록 |
+| `task check:play` | `play.mjs`(키보드 입력만, 게임 상태는 읽기만)로 한 바퀴를 끝까지 플레이. 주문 완료·골드 증가·이동 거리·상호작용 순서와 거리를 단언 |
+| `task check:layout` | 구역 7개의 좌표 관계와 각 모델이 실제로 로드됐는지 |
+| `task check:open` | Blender로 `room_shell.glb`를 직접 읽어 방 안을 가르는 벽이 없는지 |
+| `task check:fixtures` | Blender로 주문 창구·옵션 교환의 크기(높이 ≥ 2.2 m, 폭 ≥ 2.4 m) 실측 |
+| `task verify` | 헤드리스 로드, 콘솔 에러 있으면 실패 |
+
+마지막 전체 실행 결과: 모두 exit 0, fps 60, 에러 0, `check:play`는 주문 1건 완료(골드 500 → 798).
+
+## 에셋
+
+**새로 만든 것 (이번 작업, fal 호출 없음):** Blender 스크립트 `build_props.py`로 만든 GLB 10종입니다.
+`room_shell`, `room_order_window`, `room_exchange`, `room_anvil_bench`, `room_furnace`, `room_display`,
+`room_gate`, `room_weapon_rack`, `room_material_crate`, `fire`. 모델을 다시 만들려면 `task props`
+(= `blender --background --python build_props.py`)를 실행합니다.
+
+**재활용한 것:**
+- `assets/textures/*` — 벽돌, 작업대 나무, 바닥 판자, 달력 종이
+- `assets/models/blade.glb`, `hammer.glb` — 기본 검과 망치
+- `assets/sfx/*`, `assets/music/forge_theme.mp3` — 효과음과 음악
+
+재활용한 텍스처·검·망치·사운드는 이전 빌드에서 fal로 생성한 것이고, 생성 기록은 `assets/*/fal_log.json`에 남아 있습니다.
+이번 재구성에서는 fal을 호출하지 않았고 `fal_log.json`도 바꾸지 않았습니다.
+
+사용되지 않는 이전 빌드 모델(`anvil`, `bench`, `bucket`, `cabinet`, `hearth`, `hearth_fire`, `lamp`, `stool`, `toolrack`)은 파일만 남아 있고
+게임에서 로드하지 않습니다(`probe/models_loaded.txt`에 기록된 로드 목록에 없음).
+
+## 룩
+
+ACES Filmic 톤매핑, 올리브 그래파이트 팔레트(`#0e0e0d`~`#555946`), 따뜻한 앰버 키 라이트와 화로 불빛, 지수 안개를 씁니다.
+후처리(블룸, 비네트, 그레인, 색수차)는 약하게 줄여 둔 상태입니다: 블룸 0.20, 비네트 0.30, 그레인 0.004.
+자세한 값은 `SPEC.md`의 Look 절을 보세요.
+
+## 영상과 다른 점 / 알려진 문제
+
+- **화로**가 평평한 상자처럼 보이고 불빛이 화로와 벽 사이로 샙니다. 아치 입구 방향이 벽 쪽을 향한 것으로 보입니다.
+- **벽돌**이 영상보다 큽니다.
+- **방이 휑합니다.** 영상에 있는 벽 메모지, 도구 선반, 램프 같은 소품이 없습니다.
+- 한 바퀴 이동 거리가 13.65 m라서 `check:play`의 15 m 기준을 채우려고 `play.mjs`가 서쪽을 한 번 돌아갑니다.
+- 입력은 키보드와 마우스뿐입니다. 휴대폰·태블릿에서는 화면은 열리지만 조작할 수 없습니다.
+- `takes/`, `pairs/`, `study/`는 **이전 빌드(고정 벤치 시점)** 기준 산출물입니다. 현재 게임과 맞지 않으니 비교용으로 쓰지 마세요.
+  `*.mp4`는 `.gitignore` 대상이라 녹화본은 추적되지 않습니다. `probe/`도 무시되므로 검사 스크립트는 로컬에만 있습니다.
+
+## 파일
+
 ```
-
-Rebuild the Blender props: `blender --background --python build_props.py`
-Shrink a generated mesh: `blender --background --python shrink.py -- in.glb out.glb`
-
-## Tasks
-
-`Taskfile.yml` (go-task) wraps everything above. `task` lists them, `task doctor` checks the toolchain.
-
-```bash
-task serve        # :8123
-task verify       # headless load, fails on any console error
-task shot QUERY='station=shop' OUT=probe/shop.png
-task record       # re-film the take with seed 3 (SEED=, REC_SECONDS=, OUT= to override)
-task best         # rank windows, cut takes/take_best10.mp4
-task pairs        # rebuild the three side-by-side pairs
-task props        # rebuild the Blender GLBs (skipped when up to date)
-task shrink -- assets/models/in.glb assets/models/out.glb
-task cost         # per-endpoint count of the logged fal calls
-task study        # clip the forge segment, then frames + sheet + palette
+index.html           게임 전체 (Three.js, import map, 빌드 없음)
+SPEC.md              규칙·구역·상태 계약·룩 명세
+build_props.py       Blender 소품·방 생성 스크립트    shrink.py   메시 축소
+play.mjs             키보드 전용 플레이 시나리오       shot.mjs    스크린샷 도우미
+Taskfile.yml         task 러너 (serve, play, check:*, verify, props, ...)
+assets/models/       GLB (새 room_*·fire + 재활용 blade·hammer)
+assets/textures/     재활용 텍스처       assets/sfx/, assets/music/   재활용 사운드
+refs/                영상 스틸, 컨택트 시트, room_layout.md(소품 치수·앵커), 미리보기
+probe/               검사 스크립트와 산출물 (gitignore)
+study/ takes/ pairs/ 이전 빌드 기준 영상 분석·녹화·비교
 ```
-
-`fal:image`, `fal:sfx` and `fal:mesh` are thin wrappers over `fal_asset.py` — they spend money, so they are not
-wired into anything automatic.
-
-## Files
-
-```
-index.html          the whole game (Three.js 0.160 from a pinned import map, no build step)
-assets/textures/    fal images: brick, bench, floor, calendar
-assets/models/      blade + hammer (fal image-to-3D) and 8 Blender props (GLB)
-assets/sfx/         12 fal sound effects      assets/music/  1 fal track
-play.mjs            the keyboard scenario       takes/        recordings
-pairs/              side-by-side against the video
-SPEC.md             the spec written before the code
-build_props.py      procedural props       shrink.py   mesh decimation
-shot.mjs            one-shot screenshot helper (dev)
-Taskfile.yml        task runner: serve, verify, record, pairs, props, cost
-study/ refs/        frames and stills taken from the video
-```
-
-`forgetax.mp4` stays as the source reference; `.gitignore` excludes `*.mp4`, so the takes are not tracked.
