@@ -50,10 +50,15 @@ tasks:
         ignore_error: true
 
   serve:
-    desc: Serve the game on :8123 (Ctrl-C to stop)
+    desc: Serve the game on 0.0.0.0:8123, LAN-reachable (Ctrl-C to stop)
     interactive: true
     cmds:
-      - python3 -m http.server {{.PORT}}
+      - |
+        echo "  local  http://127.0.0.1:{{.PORT}}/index.html"
+        ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+        [ -n "$ip" ] && echo "  LAN    http://$ip:{{.PORT}}/index.html"
+        echo "  WARNING: bound to 0.0.0.0 — this repo folder is readable by everyone on your network"
+      - python3 -m http.server {{.PORT}} --bind 0.0.0.0
 
   open:
     desc: Open the game in the default browser
@@ -61,11 +66,16 @@ tasks:
       - open "{{.BASE}}/index.html"
 
   play:
-    desc: Serve the game and open it in the browser
+    desc: Serve the game on 0.0.0.0:8123 (LAN-reachable) and open it in the browser
     interactive: true
     cmds:
+      - |
+        echo "  local  http://127.0.0.1:{{.PORT}}/index.html"
+        ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+        [ -n "$ip" ] && echo "  LAN    http://$ip:{{.PORT}}/index.html"
+        echo "  WARNING: bound to 0.0.0.0 — this repo folder is readable by everyone on your network"
       - (sleep 1; open "{{.BASE}}/index.html") &
-      - python3 -m http.server {{.PORT}}
+      - python3 -m http.server {{.PORT}} --bind 0.0.0.0
 
   shot:
     desc: Screenshot the game. task shot QUERY='station=shop' OUT=probe/x.png
@@ -81,9 +91,44 @@ tasks:
     cmds:
       - mkdir -p probe
       - |
-        out=$(node shot.mjs "{{.BASE}}/index.html?autostart" probe/verify.png 4500)
+        out=$(probe/with_server.sh node shot.mjs "{{.BASE}}/index.html?autostart" probe/verify.png 4500)
         echo "$out"
         echo "$out" | grep -q 'errors 0' || { echo "console errors present" >&2; exit 1; }
+
+  check:boot:
+    desc: C1 — headless load 6 s, errors 0 and fps >= 55; records probe/models_loaded.txt
+    cmds:
+      - mkdir -p probe
+      - probe/with_server.sh node probe/check_boot.mjs
+
+  check:play:
+    desc: C2 — keyboard-only play.mjs run + final-state assertions + anti-bypass greps
+    cmds:
+      - mkdir -p probe
+      - rm -f probe/check_play_fail.png
+      - |
+        n=$(grep -nE "__game.*[^=!<>]=[^=>]|__game\.[A-Za-z_]+\(|__g'|keyboard\.insertText|dispatchEvent" play.mjs | wc -l | tr -d ' ')
+        m=$(grep "page.evaluate" play.mjs | grep -v "page.evaluate(() => window.__game.state)" | wc -l | tr -d ' ')
+        echo "anti-bypass grep 1 = $n, grep 2 = $m"
+        [ "$n" = 0 ] && [ "$m" = 0 ] || { echo "play.mjs bypass grep failed" >&2; exit 1; }
+      - probe/with_server.sh node probe/check_play.mjs
+
+  check:layout:
+    desc: C3 — zones layout contract and zone models actually loaded
+    cmds:
+      - task: check:boot
+        ignore_error: true
+      - probe/with_server.sh node probe/check_layout.mjs
+
+  check:open:
+    desc: C6 — Blender measures room_shell.glb interior verts (no partition) == 0
+    cmds:
+      - bash -c 'set -o pipefail; blender -b --factory-startup --python probe/measure_open.py 2>&1 | grep -E "SHELL|INTERIOR_VERTS|INFO inner|Error|Traceback"'
+
+  check:fixtures:
+    desc: C7 — Blender measures order window / exchange bbox, height >= 2.2 m and width >= 2.4 m
+    cmds:
+      - bash -c 'set -o pipefail; blender -b --factory-startup --python probe/measure_fixtures.py 2>&1 | grep -E "FIXTURE|Error|Traceback"'
 
   record:
     desc: Film a take with the keyboard scenario
@@ -206,7 +251,7 @@ tasks:
   clean:
     desc: Remove scratch screenshots and temp pairs
     cmds:
-      - rm -rf probe
+      - find probe -type f ! -name '*.mjs' ! -name '*.py' ! -name '*.sh' -delete
 
   clean:takes:
     desc: Delete recorded takes (they are gitignored anyway)

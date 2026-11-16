@@ -20,10 +20,9 @@ Deliverable is an **original homage**: same bench framing, palette and gamble, o
 
 ## Camera
 
-Bench mode: fixed, ~0.55 m above the bench, 22° down-pitch, **50 mm-equiv, flat** (little distortion),
-weapon bottom-left-to-centre, wall filling the top 2/3. Small camera kick (2-4 px) on impact, a slow
-2-3 cm breathing drift so it is alive. Hub mode: same eye height, first person, 55 mm, gentle 40 ms
-damped follow, no roll.
+First person, eye 1.62 m, 60° vertical FOV, no avatar. WASD walks (2.6 m/s, circle collider r=0.22 against
+walls and furniture), mouse (pointer lock after a click) **and** the arrow keys look: `←→` turn, `↑↓` pitch.
+A held blade sits low-left, the hammer low-right (only near the anvil). Small shake on impact, slight head-bob.
 
 ## Hero
 
@@ -33,30 +32,53 @@ is told by **glow** (none → thin white edge → warm gold → white-hot → pr
 
 ## The one mechanic
 
-**Strike and wager.** The bench is the slot: pay the forge tax, then swing.
-- Hold `Space` to wind up; the hammer's arc is a metre. A **heat band** on the blade sweeps while you hold
-  (the only gauge). Release inside the band and the roll is nudged toward success (*focused strike*);
-  release late and you swing wide for a weaker roll.
-- The die tumbles on the bench after each strike. Outcomes: **shatter** (blade lost), **damage** (tier −1),
-  **hold** (no change, tax paid), **rise** (+1), **surge** (+2..+4, prismatic flare, the video's 대성공).
-- Each blade has a limited number of strikes (pips on its plaque); when they run out it is spent and can
-  only be sold.
+**Strike and wager** (kept from the first build). Near the anvil, hold `Space` to wind up; a heat band on a
+small HUD gauge sweeps while you hold. Release inside the band and the roll is nudged toward success
+(*focused strike*); late means a weaker roll. A hotter bar gives a wider band. Outcomes: **shatter** (bar
+lost, take another), **damage** (tier −1), **hold**, **rise** (+1), **surge** (+2..+3, prismatic flare).
+Each strike costs 12 g. The band can be widened ×1.9 once by the exchange's tonic.
 
-## Key moment (must be in the take)
+## World (the rebuilt room, art3d GLBs)
 
-A **surge** on a high-tier blade: white-hot flare, prismatic spill across the bench, sparks, camera kick,
-hammer held raised. The take must reach it.
+One 10 × 8 m room, centre = origin, `+x` east, `+z` south. Models: `room_shell`, `room_order_window`,
+`room_exchange`, `room_anvil_bench`, `room_furnace`, `room_display`, `room_gate`, `room_weapon_rack`,
+`room_material_crate`, plus `fire.glb` in the firebox; `blade.glb` and `hammer.glb` are recycled.
+Colliders are the loaded models' footprints (shrunk 6 cm) plus any interior brick boxes read from the shell (none now: one open room).
 
-## World
+| zone | where | model | role |
+|---|---|---|---|
+| `order` | north wall, west bay (x≈-1.6, 2.05 m deep, stand at z≈-1.9) | order window | take the order, deliver the blade; a dark silhouette waits at the window while an order is open |
+| `exchange` | north wall, east bay (x≈+1.6) | exchange panel | spend 100 g on a steadying tonic (wider band, next strike) |
+| `craft` | east, anvil bench + material crate | anvil bench, crate | take an iron bar (40 g), strike (`Space`) |
+| `forge` | east, furnace front | furnace + fire | heat the bar to 100 % (cools over ~45 s; a strike needs ≥ 20 %) |
+| `display` | south wall | lit cabinet | put a finished blade on show and sell it (80 % of its value) |
+| `gate` | west, opening | iron gate | decoration (chained shut) |
+| `rack` | west wall beside the gate | weapon rack | hang a finished blade (decoration, no gold) |
 
-One room, three places:
-- **Bench** (the still frame of the video) — the interaction.
-- **Hearth** — arched stone furnace, fire in it; stand close to **re-heat** a damaged blade (restores 1 tier,
-  costs gold).
-- **Shelf** — lit cabinet with three blades of rising quality; walk up and `Space` to buy; the bought blade
-  is carried to the bench.
-Loop: buy → bench → strike → sell or re-heat → bigger blade. Goal: sell a blade at **+10 or better** (a
-"masterwork"); that ends the run on a calm hearth shot. `R` restarts.
+Each zone is `{x, z, radius, model}` — `x,z` is a standing spot in front of the prop, `radius` the reach.
+The engine, not the caller, checks `dist(player, zone) ≤ radius` before any interaction.
+
+## Loop
+
+`order`: `E` hear an order (a blade of tier ≥ N) → `craft`: `E` take a bar → `forge`: `E` heat →
+`craft`: hold `Space`, release in the band (repeat until the blade reaches the order's tier) → `order`: `E`
+deliver, paid `pay + 90 × (tier − wanted)`. Side paths: `exchange` (tonic), `display` (sell), `rack` (hang).
+Start gold 500; `R` restarts the run (same seed ⇒ same orders and rolls).
+
+```
+order(E accept) → craft(E pickup) → forge(E heat) → craft(Space strike, tier up?) → order(E deliver) → gold
+                                            ↑ no, strike again / reheat ┘
+```
+
+Keys: `WASD` move · mouse / `←→↑↓` look · `E` use · `Space` strike · `R` restart.
+URL: `?autostart` skips the title, `?seed=N` fixes orders and rolls, `?cam=x,y,z,yaw,pitch` is a debug camera.
+
+## State contract (`window.__game.state`)
+
+`fps, phase ('title'|'play'), gold, goldStart, ordersCompleted, player:{x,z,yaw,pitch,traveled},
+held (null | {name,tier,struck,heat}), order, zones:{order,exchange,craft,forge,display,gate,rack},
+interactLog:[{action,zone,dist,t}]` where `action ∈ accept(order) pickup(craft) heat(forge) strike(craft)
+deliver(order) exchange display hang`. Also `charging, cursor, zoneLo, zoneHi, outcome, calib, displayed, hung, near, prompt`.
 
 ## Look
 
@@ -64,11 +86,7 @@ Loop: buy → bench → strike → sell or re-heat → bigger blade. Goal: sell 
   greens, crushed blacks.
 - Fog: exponential, near-black olive, so the room's far wall melts.
 - Bloom: threshold high; only the blade glow, the fire and the lamp bloom.
-- Vignette ~0.5, grain ~0.035, slight chromatic aberration on the glow.
+- Vignette ~0.30, grain ~0.012, faint chromatic aberration on the glow.
 - Materials: rough brick with mortar shadow, oily dark plank floor, worn bench top with burn marks,
   pitted iron for anvil/hammer. Metal is the only shiny thing.
 - Text: title, one controls line, and small corner readouts (gold, tier pips). No plaque of stat rows.
-
-## Players
-
-One.

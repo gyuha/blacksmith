@@ -15,18 +15,26 @@
   #title h1 { margin: 0; font-size: 46px; font-weight: 400; color: #ecdcbc;
               text-shadow: 0 0 30px rgba(255,150,50,.30); }
   #title p  { margin: 15px 0 0; font-size: 12px; letter-spacing: .24em; color: #8d7a60; }
-  #hint { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-          font-size: 11.5px; letter-spacing: .2em; color: #8a7861; opacity: .85; white-space: nowrap;
-          transition: opacity .5s; }
-  #corner { position: absolute; left: 20px; bottom: 18px; font-size: 13px; letter-spacing: .1em;
-            display: flex; gap: 16px; align-items: center; color: #b8a284; opacity: 0; transition: opacity .8s; }
+  #hint { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+          font-size: 11.5px; letter-spacing: .2em; color: #8a7861; opacity: .85; white-space: nowrap; }
+  #corner { position: absolute; left: 20px; top: 18px; font-size: 13px; letter-spacing: .1em;
+            display: flex; flex-direction: column; gap: 7px; color: #b8a284; opacity: 0; transition: opacity .8s; }
   #corner .coin { width: 11px; height: 11px; border-radius: 50%; display: inline-block;
                   background: radial-gradient(circle at 35% 30%, #ffd88a, #a9741f 70%, #5c3d0d);
                   box-shadow: 0 0 10px rgba(255,180,70,.5); margin-right: 7px; vertical-align: -1px; }
-  #tierTag { color: #e0cba6; opacity: .92; }
-  #prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%);
-            font-size: 12px; letter-spacing: .26em; color: #c8a878; opacity: 0; transition: opacity .35s;
-            text-shadow: 0 0 14px rgba(255,140,40,.35); }
+  #order, #heldTag { color: #e0cba6; opacity: .92; font-size: 12px; letter-spacing: .12em; }
+  #prompt { position: absolute; left: 50%; top: 60%; transform: translateX(-50%);
+            font-size: 12.5px; letter-spacing: .24em; color: #d2ae7c; opacity: 0; transition: opacity .25s;
+            text-shadow: 0 0 14px rgba(255,140,40,.35); white-space: nowrap; }
+  #toast { position: absolute; left: 50%; top: 68%; transform: translateX(-50%);
+           font-size: 12px; letter-spacing: .2em; color: #e8d2a8; opacity: 0; transition: opacity .4s;
+           text-shadow: 0 0 12px rgba(0,0,0,.9); white-space: nowrap; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1px 0 0 -1px;
+           border-radius: 50%; background: rgba(230,210,170,.55); }
+  #gauge { position: absolute; left: 50%; top: 72%; width: 300px; height: 9px; margin-left: -150px;
+           background: rgba(10,9,7,.78); border: 1px solid #3a3326; opacity: 0; transition: opacity .15s; }
+  #gband { position: absolute; top: 0; bottom: 0; background: #39ff7a55; border: 1px solid #39ff7a; }
+  #gcur { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff0d0; box-shadow: 0 0 8px #ffd9a0; }
   #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 </style>
 <script type="importmap">
@@ -38,9 +46,12 @@
 </head>
 <body>
 <div id="ui">
-  <div id="title"><h1>THE TEMPER</h1><p>a forge, a wager, a number that keeps climbing</p></div>
-  <div id="corner"><span><i class="coin"></i><b id="gold">2,000</b></span><span id="tierTag"></span></div>
+  <div id="title"><h1>THE TEMPER</h1><p>take the order · heat · strike · deliver</p></div>
+  <div id="corner"><span><i class="coin"></i><b id="gold">0</b></span><span id="order"></span><span id="heldTag"></span></div>
+  <div id="cross"></div>
   <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="gauge"><div id="gband"></div><div id="gcur"></div></div>
   <div id="hint"></div>
   <div id="flash"></div>
 </div>
@@ -58,33 +69,34 @@ let seed = +(Q.get('seed') || 1);
 const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 for (let i = 0; i < 37; i++) rand();   // let a small seed settle before the first roll
 
-// palette sampled from the video with study_video.py: olive graphite, near-black, warm amber
-const PAL = { haze: 0x0d0e0b, brick: 0x8a7c68, floor: 0x8f8676, amber: 0xffa64d, ember: 0xff6a1e };
+const PAL = { haze: 0x0d0e0b };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(PAL.haze);
-scene.fog = new THREE.FogExp2(PAL.haze, 0.042);
+scene.fog = new THREE.FogExp2(PAL.haze, 0.03);
 
-const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.04, 120);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 60);
+scene.add(camera);
 
 /* ---------- post: bloom, one grade, vignette, grain, slight fringing on the glow ---------- */
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.40, 0.68, 0.90);
-composer.addPass(bloom);
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.20, 0.40, 0.92));
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.58 }, uGrain: { value: 0.030 },
-              uCA: { value: 0.0014 }, uLift: { value: new THREE.Vector3(0.019, 0.013, 0.004) },
-              uGain: { value: new THREE.Vector3(1.05, 1.0, 0.93) } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.30 }, uGrain: { value: 0.012 },
+              uCA: { value: 0.0005 }, uLift: { value: new THREE.Vector3(0.0095, 0.0065, 0.002) },
+              uGain: { value: new THREE.Vector3(1.02, 1.0, 0.97) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime,uVig,uGrain,uCA; uniform vec3 uLift,uGain; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
@@ -97,7 +109,7 @@ const grade = new ShaderPass({
       c.b = texture2D(tDiffuse, vUv - off).b;
       c = c * uGain + uLift;
       float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      c = mix(c, vec3(lum) * vec3(1.02, 1.0, 0.94), 0.20);   // pull the greens/browns together
+      c = mix(c, vec3(lum) * vec3(1.02, 1.0, 0.94), 0.10);
       c *= 1. - uVig * smoothstep(.28,.95,r*1.3);
       c += (h(vUv*1024. + fract(uTime)*91.) - .5) * uGrain * (0.55 + 0.9*(1.-dot(c,vec3(.33))));
       gl_FragColor = vec4(c,1.);
@@ -106,266 +118,213 @@ const grade = new ShaderPass({
 composer.addPass(grade);
 composer.addPass(new OutputPass());
 
-/* ---------- lights ---------- */
-scene.add(new THREE.HemisphereLight(0x7a6f5c, 0x1c1813, 0.78));
-const keyLight = new THREE.SpotLight(0xffb877, 34, 10, 0.92, 0.68, 1.35);
-keyLight.position.set(-1.25, 2.62, -1.35);
-keyLight.target.position.set(0.08, 1.0, -3.35);
+/* ---------- lights (few: one shadowed key, fire, three warm fills) ---------- */
+scene.add(new THREE.HemisphereLight(0x8a7e68, 0x2a241b, 1.9));
+const keyLight = new THREE.SpotLight(0xffb877, 150, 14, 1.25, 0.85, 1.6);
+keyLight.position.set(0, 3.1, 0.2);
+keyLight.target.position.set(0, 0, 0);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(1024, 1024);
-keyLight.shadow.bias = -0.0008;
-keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 9;
+keyLight.shadow.bias = -0.0006;
+keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 10;
 scene.add(keyLight, keyLight.target);
 
-const fireLight = new THREE.PointLight(0xff7a20, 9, 9, 2.0);
-fireLight.position.set(-3.20, 0.80, -0.40);
+const fireLight = new THREE.PointLight(0xff7a20, 22, 9, 2.0);
+fireLight.position.set(3.6, 1.0, 1.4);
 scene.add(fireLight);
-const lampLight = new THREE.PointLight(0xffc070, 2.2, 6, 2);
-lampLight.position.set(2.72, 1.10, 1.02);
-scene.add(lampLight);
-const hearthFill = new THREE.SpotLight(0xff9a4d, 22, 7, 1.0, 0.9, 1.6);
-hearthFill.position.set(-2.3, 2.1, 0.7);
-hearthFill.target.position.set(-3.4, 0.9, -0.4);
-scene.add(hearthFill, hearthFill.target);
+const northLamp = new THREE.PointLight(0xffc070, 26, 9, 2);
+northLamp.position.set(0, 2.5, -2.0);
+scene.add(northLamp);
+const westLamp = new THREE.PointLight(0xffb070, 16, 7, 2);
+westLamp.position.set(-3.4, 2.4, -0.8);
+scene.add(westLamp);
+const southLamp = new THREE.PointLight(0xffc98a, 12, 6, 2);
+southLamp.position.set(0, 2.4, 2.4);
+scene.add(southLamp);
 
-const shopFill = new THREE.SpotLight(0xffc98a, 7.5, 6.5, 1.0, 0.9, 1.6);
-shopFill.position.set(1.2, 2.2, 0.5);
-shopFill.target.position.set(3.4, 1.4, -0.55);
-scene.add(shopFill, shopFill.target);
-
-const shopLamp = new THREE.PointLight(0xffcf95, 1.9, 3.2, 2.0);
-shopLamp.position.set(2.95, 1.62, -0.55);
-scene.add(shopLamp);
-
-const roomFill = new THREE.PointLight(0xffb377, 5.5, 9, 2.0);
-roomFill.position.set(0, 2.55, -0.4);
-scene.add(roomFill);
-
-const benchGlow = new THREE.PointLight(0xffd9a0, 0, 2.6, 2.2);
-benchGlow.position.set(0.08, 1.02, -3.30);
-scene.add(benchGlow);
-
-/* ---------- textures ---------- */
-const TL = new THREE.TextureLoader();
-const loadTex = (p, rx = 1, ry = 1) => {
-  const t = TL.load(p, () => { t.needsUpdate = true; });
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(rx, ry);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
-};
-const brickTex = loadTex('assets/textures/brick.png', 8.5, 3.6);
-const floorTex = loadTex('assets/textures/floorplank.png', 11, 9);
-const woodTex = loadTex('assets/textures/benchwood.png', 1.5, 1.5);
-const paperTex = TL.load('assets/textures/paper_cal.png');
-
-/* ---------- room ---------- */
-const ROOM = { x0: -3.60, x1: 3.60, z0: -4.15, z1: 2.40, h: 3.10 };
-const wallMat = new THREE.MeshStandardMaterial({ map: brickTex, color: 0x9a8b74, roughness: 0.95 });
-const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, color: 0x9a9080, roughness: 0.88 });
-const beamMat = new THREE.MeshStandardMaterial({ color: 0x211c17, roughness: 0.9 });
-
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 6.55), floorMat);
-floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -0.875); floor.receiveShadow = true;
-scene.add(floor);
-
-const ceil = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 6.55), new THREE.MeshStandardMaterial({ color: 0x121009, roughness: 1 }));
-ceil.rotation.x = Math.PI / 2; ceil.position.set(0, ROOM.h, -0.875);
-scene.add(ceil);
-
-function wall(w, h, pos, roty) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
-  m.position.copy(pos); m.rotation.y = roty; m.receiveShadow = true;
-  scene.add(m); return m;
-}
-wall(7.2, ROOM.h, new THREE.Vector3(0, ROOM.h / 2, ROOM.z0), 0);               // north (behind bench)
-wall(6.55, ROOM.h, new THREE.Vector3(ROOM.x0, ROOM.h / 2, -0.875), Math.PI / 2); // west
-wall(6.55, ROOM.h, new THREE.Vector3(ROOM.x1, ROOM.h / 2, -0.875), -Math.PI / 2); // east
-wall(7.2, ROOM.h, new THREE.Vector3(0, ROOM.h / 2, ROOM.z1), Math.PI);          // south
-
-// ceiling beams for depth
-for (let i = 0; i < 4; i++) {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.16, 0.20), beamMat);
-  b.position.set(0, ROOM.h - 0.10, -3.5 + i * 1.7);
-  scene.add(b);
-}
-
-/* ---------- pinned notices on the north wall ---------- */
-const papers = [
-  { x: -1.42, y: 1.98, s: 0.72, r: 0.04 },
-  { x: -0.86, y: 1.94, s: 0.62, r: -0.06 },
-  { x: -0.34, y: 2.00, s: 0.54, r: 0.03 },
-  { x: 0.24, y: 1.92, s: 0.66, r: -0.03 },
-  { x: -1.24, y: 1.36, s: 0.52, r: 0.09 },
-  { x: 0.72, y: 1.96, s: 0.56, r: 0.06 },
-];
-for (const p of papers) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(p.s, p.s * 1.33),
-    new THREE.MeshStandardMaterial({ map: paperTex, transparent: true, roughness: 0.92, color: 0xbdb098 }));
-  m.position.set(p.x, p.y, ROOM.z0 + 0.035);
-  m.rotation.z = p.r;
-  scene.add(m);
-}
-
-/* ---------- props (built in Blender, GLB) ---------- */
+/* ---------- models ---------- */
 const gltfLoader = new GLTFLoader();
-const props = {};
-function place(obj, { pos = [0, 0, 0], rot = [0, 0, 0], scale = 1 }) {
-  obj.position.set(...pos);
-  obj.rotation.set(...rot);
-  obj.scale.setScalar(scale);
+const MODELS = {};              // name -> placed Object3D
+const loadErrors = [];
+const MZ = 1;   // the GLBs face +z as exported; layout z maps straight onto glTF z
+// the GLBs are centred on their own origin: seat each on the floor (y = 0)
+function seat(obj) {
   obj.updateMatrixWorld(true);
-  // the exported meshes are centred on their own origin: sit them on the floor
   const bb = new THREE.Box3().setFromObject(obj);
   obj.position.y -= bb.min.y;
+  obj.updateMatrixWorld(true);
+}
+function tame(obj) {
   obj.traverse(o => {
-    if (o.isMesh) {
-      o.castShadow = true; o.receiveShadow = true;
-      if (o.material) {
-        o.material.envMapIntensity = 0.4;
-        if (o.material.emissiveIntensity > 2.5) o.material.emissiveIntensity = 2.0;
-      }
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    const m = o.material;
+    if (m && m.emissiveIntensity > 1.6) m.emissiveIntensity = 1.6;
+  });
+}
+function loadRoom(name, [x, z], rotY = 0, cast = true) {
+  return new Promise(res => {
+    gltfLoader.load(`assets/models/${name}.glb`, g => {
+      const wrap = new THREE.Group();            // wrapper holds the z-mirror
+      const o = g.scene;
+      wrap.scale.z = MZ;
+      wrap.add(o);
+      wrap.position.set(x, 0, z);
+      wrap.rotation.y = rotY;
+      scene.add(wrap);
+      seat(wrap);
+      tame(o);
+      if (!cast) o.traverse(m => { if (m.isMesh) m.castShadow = false; });
+      MODELS[name] = wrap;
+      res(wrap);
+    }, undefined, err => { loadErrors.push(name + ': ' + err.message); res(null); });
+  });
+}
+
+/* ---------- layout: game coords, room centre origin, +x east, +z south ---------- */
+const ZONES = {
+  order:    { x: -1.6, z: -2.10, radius: 1.4, model: 'assets/models/room_order_window.glb' },
+  exchange: { x:  1.6, z: -2.30, radius: 1.4, model: 'assets/models/room_exchange.glb' },
+  craft:    { x:  3.2, z:  0.95, radius: 1.5, model: 'assets/models/room_anvil_bench.glb' },
+  forge:    { x:  3.5, z:  1.45, radius: 1.2, model: 'assets/models/room_furnace.glb' },
+  display:  { x:  0.0, z:  2.50, radius: 1.6, model: 'assets/models/room_display.glb' },
+  gate:     { x: -3.8, z:  0.0,  radius: 1.5, model: 'assets/models/room_gate.glb' },
+  rack:     { x: -3.8, z: -2.0,  radius: 1.4, model: 'assets/models/room_weapon_rack.glb' },
+};
+const PLACE = [
+  ['room_shell',        [0, 0], 0, false],
+  ['room_order_window', [-1.6, -3.45], 0],
+  ['room_exchange',     [1.6, -3.45], 0],
+  ['room_anvil_bench',  [3.15, 0.3], 0],
+  ['room_furnace',      [4.0, 2.1], 0],
+  ['room_display',      [0, 3.35], Math.PI],   // exported facing +z; turn its glass toward the room
+  ['room_gate',         [-4.85, 0], Math.PI / 2],
+  ['room_weapon_rack',  [-4.65, -2.0], Math.PI / 2],
+  ['room_material_crate', [2.8, 0.9], 0],
+];
+const STRIKE = new THREE.Vector3(3.75, 1.2, 0.38);   // top of the anvil iron inside room_anvil_bench.glb
+const FIRE_POS = new THREE.Vector3(4.0, 0.7, 1.65);   // refined by eye against the firebox
+
+const roomReady = Promise.all(PLACE.map(p => loadRoom(...p))).then(() => {
+  loadFire();
+  buildColliders();
+});
+let fireObj = null;
+function loadFire() {
+  gltfLoader.load('assets/models/fire.glb', g => {
+    const w = new THREE.Group();
+    w.scale.z = MZ; w.add(g.scene);
+    w.position.copy(FIRE_POS);
+    scene.add(w);
+    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material.emissiveIntensity > 1.1) o.material.emissiveIntensity = 1.1; } });
+    fireObj = w;
+  }, undefined, e => loadErrors.push('fire: ' + e.message));
+}
+
+/* ---------- colliders: AABBs from the loaded furniture (XZ), shell interior ---------- */
+const colliders = [];
+const INNER = { x0: -4.75, x1: 4.75, z0: -3.75, z1: 3.75 };
+function buildColliders() {
+  for (const n of ['room_order_window', 'room_exchange', 'room_anvil_bench', 'room_furnace', 'room_display',
+                   'room_gate', 'room_weapon_rack', 'room_material_crate']) {
+    const o = MODELS[n]; if (!o) continue;
+    o.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(o);
+    const g = 0.06;   // collide a touch inside the visuals so the tight gaps stay walkable
+    colliders.push({ n, x0: b.min.x + g, x1: b.max.x - g, z0: b.min.z + g, z1: b.max.z - g });
+  }
+  // interior walls of the shell: every authored 24-vertex brick box that is neither an outer wall nor above head height
+  MODELS.room_shell?.traverse(o => {
+    if (!o.isMesh || o.material.name !== 'brick') return;
+    const p = o.geometry.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i + 24 <= p.count; i += 24) {
+      const bb = new THREE.Box3();
+      for (let k = 0; k < 24; k++) bb.expandByPoint(v.fromBufferAttribute(p, i + k).applyMatrix4(o.matrixWorld));
+      if (bb.max.x - bb.min.x > 8 || bb.max.z - bb.min.z > 7.5 || bb.min.y > 1.8) continue;
+      colliders.push({ n: 'shell_wall', x0: bb.min.x, x1: bb.max.x, z0: bb.min.z, z1: bb.max.z });
     }
   });
-  scene.add(obj);
-  return obj;
-}
-function fitTo(obj, targetMax, axis = null) {
-  const b = new THREE.Box3().setFromObject(obj);
-  const size = b.getSize(new THREE.Vector3());
-  const d = axis ? size[axis] : Math.max(size.x, size.y, size.z);
-  const s = targetMax / d;
-  obj.scale.setScalar(s);
-  const b2 = new THREE.Box3().setFromObject(obj);
-  obj.position.y -= b2.min.y;
-  return { size, scale: s };
 }
 
-const PROPS = {
-  bench:      { pos: [0, 0, -3.55], rot: [0, 0, 0], s: 1 },
-  hearth:     { pos: [-3.42, 0, -0.40], rot: [0, Math.PI / 2, 0], s: 0.92 },
-  hearth_fire:{ pos: [-3.16, 0, -0.40], rot: [0, Math.PI / 2, 0], s: 0.92 },
-  cabinet:    { pos: [3.40, 0, -0.55], rot: [0, -Math.PI / 2, 0], s: 1 },
-  stool:      { pos: [2.72, 0, 1.02], rot: [0, 0.25, 0], s: 1 },
-  lamp:       { pos: [2.72, 0.47, 1.02], rot: [0, 0, 0], s: 1 },
-  bucket:     { pos: [-2.95, 0, 0.95], rot: [0, 0.4, 0], s: 1 },
-  toolrack:   { pos: [1.95, 1.52, -4.10], rot: [0, 0, 0], s: 1 },
-  anvil:      { pos: [-2.15, 0, -2.65], rot: [0, 0.55, 0], s: 1 },
-};
-let loadedCount = 0;
-const loadErrors = [];
-for (const [name, p] of Object.entries(PROPS)) {
-  gltfLoader.load(`assets/models/${name}.glb`, g => {
-    props[name] = place(g.scene, p);
-    loadedCount++;
-  }, undefined, (err) => { loadErrors.push(name + ': ' + err.message); console.warn('missing prop', name, err.message); });
-}
+/* ---------- textures: kept for the sparks only; room textures live in the GLBs ---------- */
 
-/* ---------- the blade ---------- */
+/* ---------- blade + hammer (recycled) ---------- */
 const bladeMat = new THREE.MeshStandardMaterial({
   color: 0xa8aeb4, roughness: 0.50, metalness: 0.62, emissive: 0x000000, emissiveIntensity: 1
 });
-let bladeModel = null;
-const bladeGroup = new THREE.Group();
-scene.add(bladeGroup);
+let bladeTpl = null;
+function bladeClone(mat = bladeMat) {
+  const m = bladeTpl.clone(true);
+  m.traverse(o => { if (o.isMesh) o.material = mat; });
+  return m;
+}
+const heldGroup = new THREE.Group();          // blade in hand (camera child)
+heldGroup.position.set(-0.30, -0.26, -0.62);
+camera.add(heldGroup);
+const hammer = new THREE.Group();             // hammer in hand (camera child)
+hammer.position.set(0.30, -0.30, -0.60);
+camera.add(hammer);
+const worldBlade = new THREE.Group();         // blade lying on the anvil while struck
+scene.add(worldBlade);
+worldBlade.visible = false;
+const shelfBlades = [];                       // displayed
+const rackBlades = [];
+
 gltfLoader.load('assets/models/blade.glb', g => {
   const m = g.scene;
-  fitTo(m, 0.98, 'x');
-  // the mesh is long on X, thin on Z: lay it flat (plane XY -> XZ)
-  m.rotation.x = -Math.PI / 2;
-  m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = bladeMat; } });
-  bladeGroup.add(m);
-  bladeModel = m;
-  // shelf copies
-  for (const d of DISPLAY) {
-    const c = m.clone(true);
-    const mat = new THREE.MeshStandardMaterial({
-      color: d.tint, roughness: 0.34, metalness: 0.85,
-      emissive: 0xffb060, emissiveIntensity: d.glow
-    });
-    c.traverse(o => { if (o.isMesh) { o.material = mat; o.castShadow = false; } });
-    const holder = new THREE.Group();
-    c.rotation.set(-Math.PI / 2, 0, 0);      // lay it flat
-    c.position.set(-0.42, 0.02, 0);
-    holder.add(c);
-    holder.position.set(d.onCounter ? 3.02 : 3.16, d.y, d.z);
-    holder.rotation.y = Math.PI / 2;          // run it along the shelf
-    scene.add(holder);
-    holder.updateMatrixWorld(true);
-    const hb = new THREE.Box3().setFromObject(holder);
-    holder.position.z -= (hb.min.z + hb.max.z) / 2 - d.z;   // centre it on the shelf
-    holder.position.y -= hb.min.y - d.y;
-    displayBlades.push(holder);
-  }
-});
-
-// three blades on the shop shelves (clones of the same generated mesh)
-const displayBlades = [];
-const DISPLAY = [
-  { y: 0.955, z: -1.18, tint: 0x8d8f92, glow: 0.0, onCounter: true },
-  { y: 1.125, z: -0.55, tint: 0xb9bcc2, glow: 0.30 },
-  { y: 1.605, z: -0.55, tint: 0xd8c48a, glow: 0.75 },
-];
-
-const BLADE_HOME = new THREE.Vector3(0.02, 0.888, -3.50);
-const BLADE_ROT = Math.PI - 0.30;
-bladeGroup.position.copy(BLADE_HOME);
-bladeGroup.rotation.y = BLADE_ROT;
-
-/* ---------- the hammer ---------- */
-const hammer = new THREE.Group();          // pivot sits at the grip, head points up
-scene.add(hammer);
-const HAM_REST = 0.35, HAM_HIT = 1.42;     // swing angle about Z (positive brings the head left/down)
+  const b = new THREE.Box3().setFromObject(m);
+  const s = 0.98 / (b.max.x - b.min.x);
+  m.scale.setScalar(s);
+  m.rotation.x = -Math.PI / 2;               // lay it flat (plane XY -> XZ)
+  bladeTpl = new THREE.Group(); bladeTpl.add(m);
+  const hb = bladeClone();
+  hb.rotation.set(0, Math.PI / 2 + 0.25, 0.9);   // point up and forward in the hand
+  hb.scale.setScalar(0.62);
+  heldGroup.add(hb);
+  const wb = bladeClone();
+  wb.rotation.y = 0.5;
+  worldBlade.add(wb);
+}, undefined, e => loadErrors.push('blade: ' + e.message));
 gltfLoader.load('assets/models/hammer.glb', g => {
   const m = g.scene;
   const b = new THREE.Box3().setFromObject(m);
-  const size = b.getSize(new THREE.Vector3());
-  const s = 0.62 / size.y;
+  const s = 0.36 / (b.max.y - b.min.y);
   m.scale.setScalar(s);
   const b2 = new THREE.Box3().setFromObject(m);
   m.position.set(-(b2.min.x + b2.max.x) / 2, -b2.min.y, -(b2.min.z + b2.max.z) / 2);
-  m.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  m.traverse(o => { if (o.isMesh) o.castShadow = false; });
   hammer.add(m);
-});
-hammer.position.set(0.72, 0.860, -3.30);
-hammer.rotation.set(0, -0.28, HAM_REST);
+}, undefined, e => loadErrors.push('hammer: ' + e.message));
+const HAM_REST = -0.30, HAM_HIT = 0.35;
+hammer.rotation.set(0.2, 0.2, HAM_REST);
+hammer.visible = false;
 
-/* ---------- die ---------- */
-const die = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 0.055),
-  new THREE.MeshStandardMaterial({ color: 0xc9c0ad, roughness: 0.55, metalness: 0.05 }));
-die.castShadow = true;
-die.position.set(0.46, 0.915, -3.30);
-die.visible = false;
-scene.add(die);
-
-/* ---------- focus gauge (diegetic, on the bench) ---------- */
-const gauge = new THREE.Group();
-const plateMat = new THREE.MeshStandardMaterial({ color: 0x14100c, roughness: 0.82, metalness: 0.22 });
-const plate = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.062, 0.010), plateMat);
-gauge.add(plate);
-const trackMat = new THREE.MeshStandardMaterial({ color: 0x0b0a08, roughness: 0.7, emissive: 0x070604 });
-const track = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.016, 0.020), trackMat);
-gauge.add(track);
-const zoneMat = new THREE.MeshStandardMaterial({ color: 0x1b3320, emissive: 0x39ff7a, emissiveIntensity: 0.55, roughness: 0.5 });
-const zoneMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.022, 0.024), zoneMat);
-gauge.add(zoneMesh);
-const cursorMat = new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffd9a0, emissiveIntensity: 2.6 });
-const cursor = new THREE.Mesh(new THREE.BoxGeometry(0.010, 0.038, 0.028), cursorMat);
-gauge.add(cursor);
-gauge.position.set(-0.02, 1.115, -3.88);
-gauge.visible = false;
-scene.add(gauge);
-const GAUGE_W = 0.60;
+/* ---------- customer silhouette + bell at the order window ---------- */
+const customer = new THREE.Group();
+{
+  const mat = new THREE.MeshStandardMaterial({ color: 0x0a0907, roughness: 1 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.30, 1.05, 10), mat);
+  body.position.y = 0.58;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), mat);
+  head.position.y = 1.32;
+  customer.add(body, head);
+  customer.position.set(-1.6, 0, -3.72);
+  customer.visible = false;
+  scene.add(customer);
+}
+const bell = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  new THREE.MeshStandardMaterial({ color: 0xb08a3a, metalness: 0.9, roughness: 0.3, emissive: 0x402a08, emissiveIntensity: 0.6 }));
+bell.position.set(-2.3, 0.24, -2.95);
+scene.add(bell);
 
 /* ---------- sparks ---------- */
-const SPARKS = 260;
+const SPARKS = 220;
 const sparkPos = new Float32Array(SPARKS * 3);
 const sparkVel = new Float32Array(SPARKS * 3);
 const sparkLife = new Float32Array(SPARKS);
+for (let i = 0; i < SPARKS; i++) sparkPos[i * 3 + 1] = -50;
 const sparkGeo = new THREE.BufferGeometry();
 sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
-sparkGeo.setAttribute('aLife', new THREE.BufferAttribute(sparkLife, 1));
 function dotTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -377,30 +336,24 @@ function dotTexture() {
   g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-const sparkMat = new THREE.PointsMaterial({
-  color: 0xffc070, size: 0.030, transparent: true, opacity: 0.95, map: dotTexture(),
+const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({
+  color: 0xffc070, size: 0.035, transparent: true, opacity: 0.95, map: dotTexture(),
   blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, alphaTest: 0.01
-});
-const sparks = new THREE.Points(sparkGeo, sparkMat);
+}));
 sparks.frustumCulled = false;
 scene.add(sparks);
 let sparkHead = 0;
-function burst(n, origin, power = 1) {
+function burst(n, o, power = 1) {
   for (let k = 0; k < n; k++) {
     const i = sparkHead++ % SPARKS;
-    sparkPos[i * 3] = origin.x + (rand() - .5) * 0.10;
-    sparkPos[i * 3 + 1] = origin.y + (rand() - .5) * 0.03;
-    sparkPos[i * 3 + 2] = origin.z + (rand() - .5) * 0.10;
-    const a = rand() * Math.PI * 2, up = 0.6 + rand() * 2.0 * power;
-    const sp = (0.5 + rand() * 1.9) * power;
-    sparkVel[i * 3] = Math.cos(a) * sp;
-    sparkVel[i * 3 + 1] = up;
-    sparkVel[i * 3 + 2] = Math.sin(a) * sp * 0.7;
+    sparkPos[i * 3] = o.x + (rand() - .5) * 0.10;
+    sparkPos[i * 3 + 1] = o.y + (rand() - .5) * 0.03;
+    sparkPos[i * 3 + 2] = o.z + (rand() - .5) * 0.10;
+    const a = rand() * Math.PI * 2, up = 0.6 + rand() * 2.0 * power, sp = (0.5 + rand() * 1.9) * power;
+    sparkVel[i * 3] = Math.cos(a) * sp; sparkVel[i * 3 + 1] = up; sparkVel[i * 3 + 2] = Math.sin(a) * sp * 0.7;
     sparkLife[i] = 1.0;
   }
-  sparkHead = sparkHead % SPARKS;
-  sparkGeo.attributes.position.needsUpdate = true;
-  sparkGeo.attributes.aLife.needsUpdate = true;
+  sparkHead %= SPARKS;
 }
 function updateSparks(dt) {
   let any = false;
@@ -412,16 +365,16 @@ function updateSparks(dt) {
     sparkPos[i * 3] += sparkVel[i * 3] * dt;
     sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt;
     sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
-    if (sparkPos[i * 3 + 1] < 0.895) { sparkPos[i * 3 + 1] = 0.895; sparkVel[i * 3 + 1] *= -0.25; sparkVel[i * 3] *= 0.7; sparkVel[i * 3 + 2] *= 0.7; }
-    if (sparkLife[i] <= 0) { sparkPos[i * 3 + 1] = -50; }
+    if (sparkPos[i * 3 + 1] < 0.03) { sparkPos[i * 3 + 1] = 0.03; sparkVel[i * 3 + 1] *= -0.25; sparkVel[i * 3] *= 0.7; sparkVel[i * 3 + 2] *= 0.7; }
+    if (sparkLife[i] <= 0) sparkPos[i * 3 + 1] = -50;
   }
-  if (any) { sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.aLife.needsUpdate = true; }
+  if (any) sparkGeo.attributes.position.needsUpdate = true;
 }
 
 /* ---------- audio ---------- */
 const AUD = {};
 for (const n of ['strike', 'hammer_whoosh', 'success', 'surge', 'shatter', 'damage', 'fire_loop',
-                 'coin', 'dice', 'select', 'ambient', 'purchase']) {
+                 'coin', 'select', 'ambient', 'purchase']) {
   const a = new Audio(`assets/sfx/${n}.mp3`);
   a.preload = 'auto';
   if (n === 'fire_loop' || n === 'ambient') { a.loop = true; a.volume = n === 'fire_loop' ? 0.16 : 0.13; }
@@ -453,127 +406,84 @@ const sfx = (n, vol = 1) => {
   c.play().catch(() => {});
 };
 
-/* ---------- game state ---------- */
-const BLADES = [
-  { name: 'scrap iron',   cost: 800,  base: 950,  strikes: 7 },
-  { name: 'folded steel', cost: 2400, base: 2500, strikes: 8 },
-  { name: 'starfall',     cost: 6800, base: 7000, strikes: 8 },
-];
-const valueOf = b => Math.round(b.base * Math.pow(1.36, b.tier));
-const taxOf = b => Math.min(80, Math.round(valueOf(b) * 0.01 + 10));
+/* ---------- game rules ---------- */
+const GOLD_START = 500;
+const MATERIAL_COST = 40;
+const EXCHANGE_COST = 100;
+const taxOf = () => 12;
+const valueOf = tier => Math.round(120 * Math.pow(1.36, tier));
+const ORDER_NAMES = ['short blade', 'long blade', 'broad blade', 'slim blade', 'hooked blade'];
+function newOrder() {
+  const req = ordersDone < 1 ? 1 : 1 + Math.floor(rand() * 3);      // tier wanted
+  return { name: ORDER_NAMES[Math.floor(rand() * ORDER_NAMES.length)], req, pay: 260 + 90 * req };
+}
+let ordersDone = 0;
 
 const S = {
-  phase: Q.has('autostart') ? 'hub' : (Q.get('cam') === 'bench' ? 'bench' : 'title'),
-  mode: Q.get('cam') === 'bench' ? 'bench' : 'hearth',
-  pos: new THREE.Vector3(0, 0, -0.4),
-  yaw: 0,
-  gold: 2000,
-  held: { ...BLADES[0], tier: 0, strikes: 7 },
-  near: null,
-  charging: false,
-  charge: 0,
-  cursor: 0,
-  zoneLo: 0.70, zoneHi: 0.86,
-  chargeTime: 0.95,
-  focus: false,
-  outcome: null,
-  resolveT: 0,
-  t: 0,
-  fps: 0,
-  ended: null,
-  bladeScale: 1,
-  glow: 0,
-  hue: 0,
-  shake: 0,
-  hitDone: false,
+  phase: Q.has('autostart') ? 'play' : 'title',
+  pos: new THREE.Vector3(-0.6, 0, 0.2), yaw: 0.0, pitch: -0.08,
+  traveled: 0,
+  gold: GOLD_START, goldStart: GOLD_START,
+  held: null,            // { name, tier, struck, heat }
+  order: null,
+  calib: false,          // exchange: next strike's band is widened
+  displayed: 0, hung: 0,
+  charging: false, charge: 0, zoneLo: 0.70, zoneHi: 0.86, chargeTime: 0.95,
+  focus: false, outcome: null, shake: 0,
+  t: 0, fps: 0, log: [],
+  prompt: '', toast: '', toastT: 0, near: null,
 };
-// three fixed vantage points in the forge; A/D steps between them
-const STATIONS = {
-  hearth: { pos: new THREE.Vector3(-0.05, 1.56, -0.30), look: new THREE.Vector3(-3.45, 1.02, -0.42), fov: 44 },
-  bench:  { pos: new THREE.Vector3(0.08, 1.400, -2.12), look: new THREE.Vector3(0.02, 1.020, -3.60), fov: 45 },
-  shop:   { pos: new THREE.Vector3(0.55, 1.52, -0.55), look: new THREE.Vector3(3.30, 1.22, -0.55), fov: 56 },
-};
-const STATION_ORDER = ['hearth', 'bench', 'shop'];
-
-const HUB_EYE = 1.60, HUB_FOV = 50;
-const BENCH_CAM = STATIONS.bench;
-if (Q.get('cbz')) BENCH_CAM.pos.z = +Q.get('cbz');
-if (Q.get('cby')) BENCH_CAM.pos.y = +Q.get('cby');
-if (Q.get('cfov')) BENCH_CAM.fov = +Q.get('cfov');
-if (Q.get('clz')) BENCH_CAM.look.z = +Q.get('clz');
-if (Q.get('cly')) BENCH_CAM.look.y = +Q.get('cly');
-
-/* ---------- helpers ---------- */
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 function setZone() {
   const t = S.held ? S.held.tier : 0;
   let width = clamp(0.185 - 0.007 * t, 0.100, 0.21);
-  if (S.quenched) width *= 1.9;
+  if (S.held) width *= 0.8 + 0.4 * S.held.heat;
+  if (S.calib) width *= 1.9;
   const lo = clamp(0.66 + 0.008 * t, 0.66, 0.78);
-  S.zoneLo = lo;
-  S.zoneHi = clamp(lo + width, 0, 1.0);
+  S.zoneLo = lo; S.zoneHi = clamp(lo + width, 0, 1.0);
   S.chargeTime = clamp(0.80 + 0.042 * t, 0.80, 1.30);
-  zoneMesh.scale.x = ((S.zoneHi - S.zoneLo) * GAUGE_W) / 0.12;
-  zoneMesh.position.x = ((S.zoneLo + S.zoneHi) / 2 - 0.5) * GAUGE_W;
+  gband.style.left = (S.zoneLo * 100) + '%';
+  gband.style.width = ((S.zoneHi - S.zoneLo) * 100) + '%';
 }
 
 function outcomeWeights(tier, focused) {
   const t = clamp(tier, 0, 12);
-  let w = {
-    shatter: 0.035 + 0.016 * t,
-    damage: 0.090,
-    hold: 0.130,
-    surge: 0.085 + 0.006 * t,
-    rise: Math.max(0.22, 0.58 - 0.016 * t),
-  };
+  let w = { shatter: 0.035 + 0.016 * t, damage: 0.090, hold: 0.130, surge: 0.085 + 0.006 * t, rise: Math.max(0.22, 0.58 - 0.016 * t) };
   if (focused) { w.shatter *= 0.45; w.damage *= 0.7; w.surge *= 1.30; }
   const sum = Object.values(w).reduce((a, b) => a + b, 0);
   for (const k in w) w[k] /= sum;
   return w;
 }
-
 function roll(tier, focused) {
   const w = outcomeWeights(tier, focused);
   let r = rand(), acc = 0;
-  for (const k of ['shatter', 'damage', 'hold', 'surge', 'rise']) {
-    acc += w[k];
-    if (r <= acc) return k;
-  }
+  for (const k of ['shatter', 'damage', 'hold', 'surge', 'rise']) { acc += w[k]; if (r <= acc) return k; }
   return 'rise';
 }
-let lastProbs = null;
 
 /* ---------- UI ---------- */
 const el = id => document.getElementById(id);
-const ui = { title: el('title'), hint: el('hint'), corner: el('corner'), gold: el('gold'),
-             tierTag: el('tierTag'), prompt: el('prompt'), flash: el('flash') };
-function hintFor() {
-  if (S.phase === 'title') return 'space to begin';
-  if (S.phase === 'end') return 'R to begin again';
-  if (S.mode === 'bench') return 'hold space to wind up · release in the green';
-  return 'A D step along the forge · space act · R restart';
-}
-function promptFor() {
-  if (S.mode === 'bench' || S.phase === 'title' || S.phase === 'end') return '';
-  if (S.mode === 'shop') return S.held ? 'space — sell for ' + valueOf(S.held).toLocaleString() : 'space — buy a blade';
-  if (S.mode === 'hearth') return S.held ? 'space — quench (' + Math.round(valueOf(S.held) * 0.15).toLocaleString() + ')' : 'the hearth breathes';
-  return '';
-}
+const ui = { title: el('title'), hint: el('hint'), corner: el('corner'), gold: el('gold'), order: el('order'),
+             heldTag: el('heldTag'), prompt: el('prompt'), toast: el('toast'), flash: el('flash'),
+             gauge: el('gauge'), gcur: el('gcur') };
+const gband = el('gband');
 function flash(v = 0.5, ms = 130) {
-  ui.flash.style.transition = 'none';
-  ui.flash.style.opacity = String(v);
-  requestAnimationFrame(() => {
-    ui.flash.style.transition = `opacity ${ms}ms ease-out`;
-    ui.flash.style.opacity = '0';
-  });
+  ui.flash.style.transition = 'none'; ui.flash.style.opacity = String(v);
+  requestAnimationFrame(() => { ui.flash.style.transition = `opacity ${ms}ms ease-out`; ui.flash.style.opacity = '0'; });
+}
+function say(msg) { S.toast = msg; S.toastT = 2.4; }
+function updateReadouts() {
+  ui.gold.textContent = S.gold.toLocaleString();
+  ui.order.textContent = S.order ? `order: ${S.order.name} +${S.order.req} → ${S.order.pay}g` : 'order: —';
+  ui.heldTag.textContent = S.held
+    ? `holding ${S.held.struck ? 'blade' : 'bar'} +${S.held.tier} · heat ${Math.round(S.held.heat * 100)}%` + (S.calib ? ' · tonic' : '')
+    : (S.calib ? 'tonic ready' : '');
 }
 
 /* ---------- input ---------- */
 const keys = new Set();
-const tapped = new Set();          // keys pressed since the last frame (a quick tap must not be lost)
-let spaceDown = false, spaceEdge = false, prevSpace = false;
+const tapped = new Set();
+let locked = false;
 addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (!e.repeat) { keys.add(e.code); tapped.add(e.code); }
@@ -581,342 +491,327 @@ addEventListener('keydown', e => {
   startAudio();
 });
 addEventListener('keyup', e => keys.delete(e.code));
-addEventListener('pointerdown', startAudio, { once: true });
+renderer.domElement.addEventListener('click', () => {
+  startAudio();
+  if (S.phase === 'title') beginPlay();
+  renderer.domElement.requestPointerLock?.();
+});
+document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === renderer.domElement; });
+addEventListener('mousemove', e => {
+  if (!locked) return;
+  S.yaw -= e.movementX * 0.0022;
+  S.pitch = clamp(S.pitch - e.movementY * 0.0022, -1.2, 1.2);
+});
 
-function pad() { return navigator.getGamepads?.()[0] || null; }
-
-/* ---------- actions ---------- */
+function beginPlay() {
+  S.phase = 'play'; ui.title.style.opacity = '0'; ui.corner.style.opacity = '1';
+}
 function restart() {
-  S.gold = 2000; S.held = { ...BLADES[0], tier: 0, strikes: BLADES[0].strikes }; S.phase = Q.has('autostart') ? 'hub' : 'title'; S.mode = 'hearth';
-  S.ended = null; S.outcome = null; S.charging = false; S.charge = 0;
-  S.quenched = false;
-  bladeGroup.visible = true;
-  sizeBenchUI(false);
-  ui.corner.style.opacity = '1';
-  ui.title.style.opacity = Q.has('autostart') ? '0' : '1';
+  seed = +(Q.get('seed') || 1); for (let i = 0; i < 37; i++) rand();
+  ordersDone = 0;
+  S.gold = GOLD_START; S.held = null; S.order = null; S.calib = false; S.displayed = 0; S.hung = 0;
+  S.charging = false; S.charge = 0; S.outcome = null; S.focus = false; S.traveled = 0;
+  S.pos.set(-0.6, 0, 0.2); S.yaw = 0; S.pitch = -0.08;
+  S.log = [];
+  for (const b of shelfBlades.concat(rackBlades)) scene.remove(b);
+  shelfBlades.length = 0; rackBlades.length = 0;
+  S.phase = Q.has('autostart') ? 'play' : 'title';
+  ui.title.style.opacity = S.phase === 'title' ? '1' : '0';
+  ui.corner.style.opacity = S.phase === 'title' ? '0' : '1';
+  updateReadouts();
 }
 
-function shift(dir) {
-  if (S.mode === 'bench' && S.outcome) return;
-  const i = STATION_ORDER.indexOf(S.mode);
-  const n = STATION_ORDER[(i + dir + STATION_ORDER.length) % STATION_ORDER.length];
-  setStation(n);
-  sfx('select', 0.55);
-}
-function setStation(name) {
-  S.mode = name;
-  S.phase = name === 'bench' ? 'bench' : 'hub';
-  S.charging = false; S.charge = 0;
-  sizeBenchUI(name === 'bench');
-  if (name === 'bench') setZone(); else { die.visible = false; }
-}
-function beginBench() { setStation('bench'); }
-function sizeBenchUI(on) {
-  gauge.visible = on;
-  if (!on) { die.visible = false; }
+/* ---------- interaction engine (distance is judged here, never by the caller) ---------- */
+const distTo = z => Math.hypot(S.pos.x - ZONES[z].x, S.pos.z - ZONES[z].z);
+const inZone = z => distTo(z) <= ZONES[z].radius;
+function logAct(action, zone) {
+  S.log.push({ action, zone, dist: +distTo(zone).toFixed(3), t: +S.t.toFixed(2) });
 }
 
-function buyOrSell() {
-  if (S.held) {
-    const v = valueOf(S.held);
-    S.gold += v;
-    sfx('coin', 1.0);
-    const soldTier = S.held.tier;
-    S.held = null;
-    bladeGroup.visible = true;
-    if (soldTier >= 10) endRun('masterwork');
-    else if (S.gold < BLADES[0].cost) endRun('broke');
-    return { sold: v, tier: soldTier };
+// what E would do right now (null when nothing is in reach)
+function availableAction() {
+  const h = S.held;
+  if (inZone('order')) {
+    if (!S.order && !h) return { action: 'accept', zone: 'order', label: 'E — hear the order' };
+    if (S.order && h && h.struck) {
+      return h.tier >= S.order.req
+        ? { action: 'deliver', zone: 'order', label: `E — deliver for ${S.order.pay + 90 * (h.tier - S.order.req)}g` }
+        : { action: 'noop', zone: 'order', label: `the order wants +${S.order.req} (this is +${h.tier})` };
+    }
   }
-  const b = BLADES.find(b => S.gold >= b.cost);
-  if (!b) return null;
-  S.gold -= b.cost;
-  S.held = { ...b, tier: 0, strikes: b.strikes };
-  S.quenched = false;
-  sfx('purchase', 0.9);
-  return { bought: b.name };
+  if (inZone('craft') && !h && S.order) return { action: 'pickup', zone: 'craft', label: `E — take an iron bar (${MATERIAL_COST}g)` };
+  if (inZone('forge') && h) return { action: 'heat', zone: 'forge', label: 'E — heat in the furnace' };
+  if (inZone('exchange') && !S.calib) return { action: 'exchange', zone: 'exchange', label: `E — buy a steadying tonic (${EXCHANGE_COST}g)` };
+  if (inZone('display') && h && h.struck) return { action: 'display', zone: 'display', label: `E — display & sell (${Math.round(valueOf(h.tier) * 0.8)}g)` };
+  if (inZone('rack') && h && h.struck) return { action: 'hang', zone: 'rack', label: 'E — hang on the rack' };
+  if (inZone('gate')) return { action: 'noop', zone: 'gate', label: 'the gate is chained shut' };
+  if (inZone('craft') && h) return { action: 'noop', zone: 'craft', label: h.heat >= 0.2 ? 'hold SPACE — strike' : 'too cold — heat it first' };
+  return null;
 }
 
-function endRun(kind) {
-  S.phase = 'end'; S.ended = kind;
-  S.mode = 'hearth';
-  sizeBenchUI(false);
-  ui.hint.textContent = kind === 'masterwork' ? 'a masterwork, sold — R to begin again' : 'the gold ran out — R to begin again';
+function interact() {
+  const a = availableAction();
+  if (!a || a.action === 'noop') { if (a) say(a.label); return; }
+  const h = S.held;
+  switch (a.action) {
+    case 'accept':
+      S.order = newOrder();
+      customer.visible = true;
+      sfx('select', 0.8); say(`order: ${S.order.name} +${S.order.req}`);
+      break;
+    case 'pickup':
+      if (S.gold < MATERIAL_COST) { say('not enough gold'); return; }
+      S.gold -= MATERIAL_COST;
+      S.held = { name: S.order.name, tier: 0, struck: 0, heat: 0 };
+      sfx('purchase', 0.7); say('iron bar taken');
+      break;
+    case 'heat':
+      h.heat = 1.0; sfx('select', 1.0); flash(0.10, 320);
+      burst(20, new THREE.Vector3(3.6, 1.1, 1.5), 0.7);
+      say('glowing');
+      break;
+    case 'exchange':
+      if (S.gold < EXCHANGE_COST) { say('not enough gold'); return; }
+      S.gold -= EXCHANGE_COST; S.calib = true; sfx('purchase', 0.9); say('next strike: wider band');
+      setZone();
+      break;
+    case 'deliver': {
+      const pay = S.order.pay + 90 * (h.tier - S.order.req);
+      S.gold += pay; S.held = null; S.order = null; ordersDone++;
+      customer.visible = false;
+      sfx('coin', 1.0); flash(0.12, 260); say(`delivered · +${pay}g`);
+      break;
+    }
+    case 'display': {
+      const v = Math.round(valueOf(h.tier) * 0.8);
+      S.gold += v; S.held = null; S.displayed++;
+      addShelfBlade(h.tier);
+      sfx('coin', 0.9); say(`sold from the cabinet · +${v}g`);
+      break;
+    }
+    case 'hang':
+      S.held = null; S.hung++;
+      addRackBlade();
+      sfx('select', 0.9); say('hung on the rack');
+      break;
+  }
+  logAct(a.action, a.zone);
+  updateReadouts();
 }
 
-function startCharge() {
-  if (S.phase !== 'bench' || S.charging || S.outcome) return;
-  if (!S.held) return;
-  if (S.gold < taxOf(S.held)) return;      // the forge wants its fee first
+function addShelfBlade(tier) {
+  if (!bladeTpl) return;
+  const mat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness: 0.34, metalness: 0.85,
+    emissive: 0xffb060, emissiveIntensity: Math.min(0.8, tier * 0.12) });
+  const b = bladeClone(mat);
+  b.scale.setScalar(0.6);
+  b.position.set(-0.65 + (S.displayed - 1) % 3 * 0.65, 0.40, 3.18);
+  const old = shelfBlades[(S.displayed - 1) % 3];
+  if (old) scene.remove(old);
+  scene.add(b); shelfBlades[(S.displayed - 1) % 3] = b;
+}
+function addRackBlade() {
+  if (!bladeTpl) return;
+  const b = bladeClone();
+  b.rotation.y = Math.PI / 2;
+  b.position.set(-4.50, 1.85 + 0.0, -2.0 - 0.5 + (rackBlades.length % 3) * 0.5);
+  b.rotation.z = 0.0;
+  scene.add(b); rackBlades.push(b);
+}
+
+/* ---------- strike (hold space near the anvil, release in the band) ---------- */
+function tryStartCharge() {
+  if (S.charging || S.outcome || !S.held) return;
+  if (!inZone('craft')) return;
+  if (S.held.heat < 0.2) { say('too cold — heat it first'); return; }
+  if (S.gold < taxOf()) { say('not enough gold'); return; }
   S.charging = true; S.charge = 0; S.focus = false;
+  setZone();
   sfx('hammer_whoosh', 0.55);
 }
-
 function releaseCharge() {
   if (!S.charging) return;
   S.charging = false;
-  const inZone = S.charge >= S.zoneLo && S.charge <= S.zoneHi;
+  if (!inZone('craft')) { say('you stepped away'); return; }
+  const inBand = S.charge >= S.zoneLo && S.charge <= S.zoneHi;
   const late = S.charge > S.zoneHi;
-  S.focus = inZone;
-  S.gold = Math.max(0, S.gold - taxOf(S.held));
-  updateReadouts();
-  lastProbs = outcomeWeights(S.held.tier, inZone);
-  S.outcome = { kind: roll(S.held.tier, inZone), t: 0, struck: false };
+  S.focus = inBand;
+  S.gold = Math.max(0, S.gold - taxOf());
+  S.outcome = { kind: roll(S.held.tier, inBand), t: 0, struck: false };
+  S.calib = false;
   S.shake = late ? 0.5 : 1.0;
-  die.visible = true;
-  die.position.set(0.46, 0.915, -3.30);
-  die.userData.spin = new THREE.Vector3(18 + rand() * 14, 12 + rand() * 12, 20 + rand() * 16);
-  die.userData.vel = new THREE.Vector3(-0.9 - rand() * 0.5, 0.35, -0.5 - rand() * 0.4);
+  logAct('strike', 'craft');
+  updateReadouts();
 }
-
 function applyOutcome() {
-  const o = S.outcome; if (!o) return;
-  const b = S.held; if (!b) return;
-  if (o.kind === 'rise') {
-    b.tier = Math.min(14, b.tier + 1);
-    sfx('success', 1.0); flash(0.16, 200);
-    burn(0.5, 1.0);
-  } else if (o.kind === 'surge') {
-    const jump = 2 + (rand() < 0.4 ? 1 : 0);
-    b.tier = Math.min(14, b.tier + jump);
-    sfx('surge', 1.0); flash(0.30, 380);
-    burn(1.6, 1.9);
-    S.surgedAt = S.t;
-  } else if (o.kind === 'hold') {
-    b.strikes--;
-    sfx('damage', 0.35); flash(0.07, 120);
-  } else if (o.kind === 'damage') {
-    b.tier = Math.max(0, b.tier - 1); b.strikes--;
-    sfx('damage', 1.0); flash(0.16, 200);
-    burn(0.25, 0.8);
-  } else if (o.kind === 'shatter') {
-    b.strikes--;
-    sfx('shatter', 1.0); flash(0.5, 260);
-    burst(70, bladeGroup.position, 1.6);
-    S.shattered = true;
-    S.held = null;
-    bladeGroup.visible = false;
-  }
+  const o = S.outcome, b = S.held;
+  if (!o || !b) return;
+  b.struck++;
+  b.heat = Math.max(0.2, b.heat - 0.05);
+  if (o.kind === 'rise') { b.tier = Math.min(14, b.tier + 1); sfx('success', 1.0); flash(0.16, 200); say('rise'); }
+  else if (o.kind === 'surge') { b.tier = Math.min(14, b.tier + 2 + (rand() < 0.4 ? 1 : 0)); sfx('surge', 1.0); flash(0.30, 380); S.surgedAt = S.t; say('SURGE'); }
+  else if (o.kind === 'hold') { sfx('damage', 0.35); flash(0.07, 120); say('held'); }
+  else if (o.kind === 'damage') { b.tier = Math.max(0, b.tier - 1); sfx('damage', 1.0); flash(0.16, 200); say('damaged'); }
+  else if (o.kind === 'shatter') { sfx('shatter', 1.0); flash(0.5, 260); burst(60, STRIKE, 1.6); S.held = null; say('shattered — take another bar'); }
   S.outcome = { ...o, done: true, t: 0 };
-  S.quenched = false;
   setZone();
   updateReadouts();
 }
 
-let burnT = 0, burnAmp = 0;
-function burn(col, amp) { burnT = 1.0; burnAmp = amp; }
-
-function updateReadouts() {
-  ui.gold.textContent = S.gold.toLocaleString();
-  if (S.held) {
-    ui.tierTag.textContent = '+' + S.held.tier + '  ·  ' + S.held.strikes + ' ⚒';
-  } else {
-    ui.tierTag.textContent = '';
+/* ---------- movement + collision ---------- */
+const PR = 0.22;
+function blocked(x, z) {
+  if (x < INNER.x0 + PR || x > INNER.x1 - PR || z < INNER.z0 + PR || z > INNER.z1 - PR) return true;
+  for (const c of colliders) {
+    const nx = clamp(x, c.x0, c.x1), nz = clamp(z, c.z0, c.z1);
+    if ((x - nx) ** 2 + (z - nz) ** 2 < PR * PR) return true;
   }
+  return false;
+}
+function move(dt) {
+  const turn = 1.7 * dt;
+  if (keys.has('ArrowLeft')) S.yaw += turn;
+  if (keys.has('ArrowRight')) S.yaw -= turn;
+  if (keys.has('ArrowUp')) S.pitch = clamp(S.pitch + turn * 0.8, -1.2, 1.2);
+  if (keys.has('ArrowDown')) S.pitch = clamp(S.pitch - turn * 0.8, -1.2, 1.2);
+  let f = 0, r = 0;
+  if (keys.has('KeyW')) f += 1;
+  if (keys.has('KeyS')) f -= 1;
+  if (keys.has('KeyD')) r += 1;
+  if (keys.has('KeyA')) r -= 1;
+  if (!f && !r) return;
+  const len = Math.hypot(f, r);
+  const sp = 2.6 * dt / len;
+  const sy = Math.sin(S.yaw), cy = Math.cos(S.yaw);
+  // forward = (-sin yaw, -cos yaw); right = (cos yaw, -sin yaw)
+  const dx = (-sy * f + cy * r) * sp, dz = (-cy * f - sy * r) * sp;
+  const ox = S.pos.x, oz = S.pos.z;
+  if (!blocked(S.pos.x + dx, S.pos.z)) S.pos.x += dx;
+  if (!blocked(S.pos.x, S.pos.z + dz)) S.pos.z += dz;
+  S.traveled += Math.hypot(S.pos.x - ox, S.pos.z - oz);
 }
 
-/* ---------- camera rigs ---------- */
-const camPos = new THREE.Vector3(0, HUB_EYE, 0.55);
-const camLook = new THREE.Vector3(0, HUB_EYE * 0.92, -1);
-let camFov = HUB_FOV;
+/* ---------- camera ---------- */
+const DEBUG_CAM = Q.get('cam');   // x,y,z,yaw,pitch
 const TOPVIEW = Q.has('top');
 function updateCamera(dt) {
   if (TOPVIEW) {
-    camera.position.set(0.3, 7.2, -0.7);
-    camera.fov = 62; camera.updateProjectionMatrix();
-    camera.lookAt(0.3, 0, -0.75);
-    camera.rotation.z = 0;
+    camera.position.set(0, 9, 0.001); camera.rotation.set(-Math.PI / 2, 0, 0, 'YXZ');
     return;
   }
-  let tPos, tLook, tFov;
-  const st = STATIONS[S.mode] || STATIONS.hearth;
-  tPos = st.pos; tLook = st.look; tFov = st.fov;
-  camPos.x = damp(camPos.x, tPos.x, 9, dt);
-  camPos.y = damp(camPos.y, tPos.y, 9, dt);
-  camPos.z = damp(camPos.z, tPos.z, 9, dt);
-  camLook.x = damp(camLook.x, tLook.x, 6, dt);
-  camLook.y = damp(camLook.y, tLook.y, 6, dt);
-  camLook.z = damp(camLook.z, tLook.z, 6, dt);
-  camFov = damp(camFov, tFov, 5, dt);
-  camera.position.copy(camPos);
-  // impact shake
+  if (DEBUG_CAM) {
+    const v = DEBUG_CAM.split(',').map(Number);
+    camera.position.set(v[0], v[1], v[2]); camera.rotation.set(v[4] || 0, v[3] || 0, 0, 'YXZ');
+    return;
+  }
+  const bob = S.moving ? Math.sin(S.t * 9) * 0.012 : 0;
+  camera.position.set(S.pos.x, 1.62 + bob, S.pos.z);
+  camera.rotation.set(S.pitch, S.yaw, 0, 'YXZ');
   if (S.shake > 0.001) {
-    const s = S.shake * 0.016;
-    camera.position.x += (rand() - .5) * s;
-    camera.position.y += (rand() - .5) * s;
+    const s = S.shake * 0.02;
+    camera.position.x += (rand() - .5) * s; camera.position.y += (rand() - .5) * s;
     S.shake *= Math.exp(-7 * dt);
   }
-  camera.fov = camFov;
-  camera.updateProjectionMatrix();
-  camera.lookAt(camLook);
 }
 
 /* ---------- update ---------- */
-const clock = new THREE.Clock();
-let fpsAcc = 0, fpsN = 0;
-let tapL = false, tapR = false;
-
+let prevSpace = false;
 function update(dt) {
   S.t += dt;
-  const P = pad();
+  const spaceDown = keys.has('Space');
+  const spaceEdge = tapped.has('Space') || (spaceDown && !prevSpace);
+  prevSpace = spaceDown;
 
-  // ---- title ----
   if (S.phase === 'title') {
-    ui.title.style.opacity = '1';
-    ui.corner.style.opacity = '0';
-    if (keys.has('Space') || keys.has('Enter') || P?.buttons[0]?.pressed) {
-      S.phase = 'hub'; ui.title.style.opacity = '0'; ui.corner.style.opacity = '1';
-      startAudio();
-    }
+    if (spaceEdge || tapped.has('Enter') || tapped.has('KeyE')) { beginPlay(); startAudio(); }
   } else {
-    ui.title.style.opacity = '0';
-    ui.corner.style.opacity = '1';
-  }
+    const px = S.pos.x, pz = S.pos.z;
+    move(dt);
+    S.moving = (S.pos.x !== px || S.pos.z !== pz);
+    if (tapped.has('KeyE')) interact();
 
-  // ---- hub movement ----
-  const padAx = pad()?.axes?.[0] || 0;
-  const moveL = tapL || (padAx < -0.6 && !S._padL);
-  const moveR = tapR || (padAx > 0.6 && !S._padR);
-  S._padL = padAx < -0.6; S._padR = padAx > 0.6;
-
-  if (S.phase !== 'title' && !S.outcome) {
-    if (moveL) shift(-1);
-    if (moveR) shift(1);
-    if (spaceEdge && S.phase === 'hub' && S.mode !== 'bench') {
-      if (S.mode === 'hearth') quench();
-      else if (S.mode === 'shop') buyOrSell();
-    }
-  }
-  S.near = S.mode;
-  S.walking = false;
-
-  // ---- bench interaction ----
-  if (S.mode === 'bench') {
+    // strike
     if (S.charging) {
       S.charge += dt / S.chargeTime;
-      if (S.charge > 1.28) releaseCharge();
-    }
-    if (spaceEdge && !S.outcome) startCharge();
-    if (!spaceDown && S.charging) releaseCharge();
-  }
+      if (!spaceDown || S.charge > 1.28) releaseCharge();
+    } else if (spaceEdge) tryStartCharge();
 
-  // ---- outcome timeline ----
+    // heat decays
+    if (S.held && S.held.heat > 0) S.held.heat = Math.max(0, S.held.heat - dt / 45);
+  }
+  tapped.clear();
+
+  // outcome timeline
   if (S.outcome) {
     S.outcome.t += dt;
     if (!S.outcome.struck && S.outcome.t > 0.16) {
-      S.outcome.struck = true;
-      sfx('strike', 1.0);
-      burst(46, new THREE.Vector3(0.24, 0.93, -3.42), 1.0);
-      S.shake = Math.max(S.shake, 0.9);
+      S.outcome.struck = true; sfx('strike', 1.0); burst(46, STRIKE, 1.0); S.shake = Math.max(S.shake, 0.9);
     }
     if (!S.outcome.done && S.outcome.t > 0.62) applyOutcome();
-    if (S.outcome.done && S.outcome.t > 1.15) {
-      S.outcome = null;
-      die.visible = false;
-      if (!S.held) {
-        setStation('hearth');
-        if (S.gold < BLADES[0].cost) endRun('broke');
-      }
-      else if (S.held.strikes <= 0) {
-        // spent: must sell
-        S.spent = true;
-      }
-    }
+    if (S.outcome.done && S.outcome.t > 1.0) { S.outcome = null; updateReadouts(); }
   }
 
-  // ---- die tumble ----
-  if (die.visible) {
-    const u = die.userData;
-    u.vel.y -= 3.0 * dt;
-    die.position.addScaledVector(u.vel, dt);
-    if (die.position.y < 0.900) { die.position.y = 0.900; u.vel.y *= -0.4; u.vel.x *= 0.82; u.vel.z *= 0.82; }
-    die.rotation.x += u.spin.x * dt; die.rotation.y += u.spin.y * dt; die.rotation.z += u.spin.z * dt;
-    u.spin.multiplyScalar(1 - 1.6 * dt);
-  }
-
-  // ---- hammer animation (bench only) ----
-  hammer.visible = S.mode === 'bench';
+  // hammer + held blade view-models
+  const nearBench = inZone('craft');
+  hammer.visible = !!S.held && nearBench;
+  heldGroup.visible = !!S.held && !(S.outcome && !S.outcome.done && S.held);
+  worldBlade.visible = !!S.held && !!S.outcome && nearBench;
+  worldBlade.position.set(STRIKE.x, STRIKE.y + 0.02, STRIKE.z);
   if (S.charging) {
-    const k = clamp(S.charge, 0, 1.25);
-    hammer.rotation.z = damp(hammer.rotation.z, HAM_REST - k * 0.34, 12, dt);   // winds further back
+    hammer.rotation.z = damp(hammer.rotation.z, HAM_REST - clamp(S.charge, 0, 1.2) * 0.35, 12, dt);
   } else if (S.outcome && S.outcome.t < 0.42) {
     const k = clamp(S.outcome.t / 0.42, 0, 1);
-    const swing = Math.sin(Math.pow(k, 0.5) * Math.PI * 0.5);                  // accelerate into the blow
-    hammer.rotation.z = HAM_REST + (HAM_HIT - HAM_REST) * swing;
-  } else {
-    hammer.rotation.z = damp(hammer.rotation.z, HAM_REST, 5.5, dt);
-  }
+    hammer.rotation.z = HAM_REST + (HAM_HIT - HAM_REST) * Math.sin(Math.pow(k, 0.5) * Math.PI * 0.5);
+  } else hammer.rotation.z = damp(hammer.rotation.z, HAM_REST, 5.5, dt);
 
-  // ---- blade glow by tier ----
+  // blade glow: heat + tier
   if (S.held) {
-    const t = S.held.tier;
-    const base = t <= 1 ? 0.0 : Math.min(2.0, (t - 1) * 0.165);
-    S.glow = damp(S.glow, base + (S.charging ? 0.35 : 0), 4, dt);
     const surgeAge = S.surgedAt ? S.t - S.surgedAt : 99;
     if (surgeAge < 2.2) {
-      S.hue = (S.hue + dt * 0.9) % 1;
-      bladeMat.emissive.setHSL(S.hue, 0.85, 0.62);
-      bladeMat.emissiveIntensity = (1 - surgeAge / 2.2) * 2.2 + 0.45;
-      benchGlow.color.setHSL(S.hue, 0.9, 0.6);
+      bladeMat.emissive.setHSL((S.t * 0.9) % 1, 0.85, 0.62);
+      bladeMat.emissiveIntensity = (1 - surgeAge / 2.2) * 2.0 + 0.4;
     } else {
-      const hot = clamp((S.held.tier - 2) / 10, 0, 1);
-      bladeMat.emissive.setRGB(1.0, 0.70 + 0.26 * hot, 0.40 + 0.50 * hot);
-      bladeMat.emissiveIntensity = S.glow;
-      benchGlow.color.set(0xffd0a0);
+      bladeMat.emissive.setRGB(1.0, 0.45 + 0.3 * (1 - S.held.heat), 0.15);
+      bladeMat.emissiveIntensity = S.held.heat * 0.7 + Math.min(0.4, S.held.tier * 0.04);
     }
-    benchGlow.intensity = 0.30 + S.glow * 0.85;
-    gauge.visible = true;
-    cursor.position.x = (clamp(S.charge, 0, 1) - 0.5) * GAUGE_W;
-    cursorMat.emissiveIntensity = 2.2 + Math.sin(S.t * 22) * 0.8;
-    const inz = S.charge >= S.zoneLo && S.charge <= S.zoneHi;
-    zoneMat.emissiveIntensity = inz ? 2.6 : 0.55;
-  } else {
-    gauge.visible = false;
-    benchGlow.intensity = damp(benchGlow.intensity, 0, 4, dt);
   }
+  if (S.moving || S.held) updateReadouts();
 
-  // blade sits on the bench only in bench mode
-  bladeGroup.visible = !!(S.held) && !S.shattered;
-  if (S.shattered && !S.outcome) S.shattered = false;
-
-  // ---- fire flicker ----
-  fireLight.intensity = 8 + Math.sin(S.t * 9.3) * 1.2 + Math.sin(S.t * 21.7) * 0.6;
-  fireLight.position.z = -0.30 + Math.sin(S.t * 5.1) * 0.03;
-
-  // ---- burn / flash on the blade ----
-  if (burnT > 0) { burnT = Math.max(0, burnT - dt * 1.4); }
-
-  // ---- sparks ----
+  // fire flicker
+  fireLight.intensity = 20 + Math.sin(S.t * 9.3) * 2.5 + Math.sin(S.t * 21.7) * 1.2;
+  if (fireObj) fireObj.scale.y = 1 + Math.sin(S.t * 7.7) * 0.06;
+  customer.position.y = Math.sin(S.t * 1.7) * 0.01;
   updateSparks(dt);
 
-  // ---- ui ----
-  ui.hint.textContent = hintFor();
-  ui.prompt.textContent = promptFor();
-  ui.prompt.style.opacity = promptFor() ? '0.9' : '0';
-
-  prevSpace = spaceDown;
+  // prompts / gauge
+  const a = S.phase === 'play' ? availableAction() : null;
+  S.near = a ? a.zone : null;
+  S.prompt = a ? a.label : '';
+  ui.prompt.textContent = S.prompt;
+  ui.prompt.style.opacity = S.prompt ? '0.92' : '0';
+  S.toastT = Math.max(0, S.toastT - dt);
+  ui.toast.textContent = S.toast;
+  ui.toast.style.opacity = S.toastT > 0 ? '1' : '0';
+  ui.gauge.style.opacity = S.charging ? '1' : '0';
+  ui.gcur.style.left = (clamp(S.charge, 0, 1) * 100) + '%';
+  ui.hint.textContent = S.phase === 'title'
+    ? 'space to begin'
+    : 'WASD move · mouse / arrows look · E use · SPACE strike · R restart';
 }
 
 /* ---------- main loop ---------- */
+const clock = new THREE.Clock();
+let fpsAcc = 0, fpsN = 0;
 function frame() {
   const dt = Math.min(clock.getDelta(), 1 / 20);
-  spaceDown = keys.has('Space') || !!(pad()?.buttons[0]?.pressed);
-  spaceEdge = tapped.has('Space') || (spaceDown && !prevSpace);
-  tapL = tapped.has('KeyA') || tapped.has('ArrowLeft');
-  tapR = tapped.has('KeyD') || tapped.has('ArrowRight');
-  tapped.clear();
-
   update(dt);
   updateCamera(dt);
   grade.uniforms.uTime.value += dt;
   composer.render();
-
   fpsAcc += dt; fpsN++;
   if (fpsAcc > 0.5) { S.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
-
   requestAnimationFrame(frame);
 }
-
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -924,62 +819,38 @@ addEventListener('resize', () => {
   composer.setSize(innerWidth, innerHeight);
 });
 
-/* ---------- quench at the hearth ---------- */
-S.quenched = false;
-function quench() {
-  if (!S.held) return;
-  const cost = Math.round(valueOf(S.held) * 0.15);
-  if (S.gold < cost) return;
-  S.gold -= cost;
-  S.held.strikes += 2;
-  S.quenched = true;
-  sfx('select', 1.0); flash(0.10, 320);
-  burst(24, new THREE.Vector3(-3.4, 1.0, -0.35), 0.7);
-  updateReadouts();
-}
-
 /* ---------- state contract ---------- */
 window.__game = {
   get loaded() {
     const out = {};
-    for (const [k, o] of Object.entries(props)) {
+    for (const [k, o] of Object.entries(MODELS)) {
       const b = new THREE.Box3().setFromObject(o);
       out[k] = { min: b.min.toArray().map(v => +v.toFixed(2)), max: b.max.toArray().map(v => +v.toFixed(2)) };
     }
-    return { count: loadedCount, errors: loadErrors, boxes: out };
+    return { count: Object.keys(MODELS).length, errors: loadErrors, boxes: out };
   },
   get state() {
-    const b = S.held;
+    const h = S.held;
     return {
-      phase: S.phase, mode: S.mode,
-      station: S.mode, x: 0, z: 0,
-      gold: S.gold, near: S.near,
-      held: !!b, tier: b ? b.tier : null, strikes: b ? b.strikes : null,
-      value: b ? valueOf(b) : 0, tax: b ? taxOf(b) : 0,
-      charging: S.charging, charge: +S.charge.toFixed(3),
-      cursor: +clamp(S.charge, 0, 1).toFixed(3),
+      fps: S.fps, phase: S.phase,
+      gold: S.gold, goldStart: S.goldStart, ordersCompleted: ordersDone,
+      player: { x: +S.pos.x.toFixed(3), z: +S.pos.z.toFixed(3), yaw: +S.yaw.toFixed(3), pitch: +S.pitch.toFixed(3), traveled: +S.traveled.toFixed(3) },
+      held: h ? { name: h.name, tier: h.tier, struck: h.struck, heat: +h.heat.toFixed(2) } : null,
+      order: S.order ? { ...S.order } : null,
+      zones: ZONES,
+      near: S.near, prompt: S.prompt,
+      charging: S.charging, charge: +S.charge.toFixed(3), cursor: +clamp(S.charge, 0, 1).toFixed(3),
       zoneLo: +S.zoneLo.toFixed(3), zoneHi: +S.zoneHi.toFixed(3),
-      focus: S.focus, outcome: S.outcome ? S.outcome.kind : null,
-      outcomeDone: !!(S.outcome && S.outcome.done),
-      probs: lastProbs, ended: S.ended, fps: S.fps, t: +S.t.toFixed(2),
+      focus: S.focus, outcome: S.outcome ? S.outcome.kind : null, outcomeDone: !!(S.outcome && S.outcome.done),
+      calib: S.calib, displayed: S.displayed, hung: S.hung,
+      interactLog: S.log, t: +S.t.toFixed(2),
     };
   }
 };
 
+setZone();
 restart();
-updateReadouts();
-// URL debug params must be applied after restart(), which resets the run
-if (Q.get('station') && STATIONS[Q.get('station')]) setStation(Q.get('station'));
-if (Q.get('tier')) {
-  S.held = { ...BLADES[1], tier: +Q.get('tier'), strikes: 5 };
-  S.mode = 'bench'; S.phase = 'bench';
-  S.gold = Q.get('gold') ? +Q.get('gold') : S.gold;
-  sizeBenchUI(true); setZone(); updateReadouts();
-} else if (Q.get('cam') === 'bench') {
-  S.mode = 'bench'; S.phase = 'bench';
-  sizeBenchUI(true); setZone();
-}
-ui.corner.style.opacity = Q.has('autostart') || Q.get('cam') === 'bench' || Q.get('tier') ? '1' : '0';
+if (Q.has('autostart')) ui.corner.style.opacity = '1';
 frame();
 </script>
 </body>
