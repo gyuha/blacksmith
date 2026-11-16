@@ -86,7 +86,7 @@ deliver(order) exchange display hang`. Also `charging, cursor, zoneLo, zoneHi, o
   greens, crushed blacks.
 - Fog: exponential, near-black olive, so the room's far wall melts.
 - Bloom: threshold high; only the blade glow, the fire and the lamp bloom.
-- Vignette ~0.30, grain ~0.012, faint chromatic aberration on the glow.
+- Vignette ~0.30, grain ~0.004, faint chromatic aberration on the glow.
 - Materials: rough brick with mortar shadow, oily dark plank floor, worn bench top with burn marks,
   pitted iron for anvil/hammer. Metal is the only shiny thing.
 - Text: title, one controls line, and small corner readouts (gold, tier pips). No plaque of stat rows.
